@@ -3,6 +3,7 @@ from decimal import Decimal
 import pytest
 
 from app.engine.engine import InvalidOrderState, TradingEngine
+from app.models import Position
 from tests.factories import make_account
 from tests.fakes import FakeMarketData
 
@@ -109,3 +110,23 @@ def test_cancel_non_pending_raises(engine, session):
     engine.cancel_order(session, order.id)
     with pytest.raises(InvalidOrderState):
         engine.cancel_order(session, order.id)
+
+
+def test_sell_full_position_accepted(engine, session):
+    acct = make_account(session)
+    session.add(Position(account_id=acct.id, symbol="SPY", qty=100,
+                         avg_cost=Decimal("100"), realized_pnl=Decimal("0")))
+    session.flush()
+    order = place(engine, session, acct, side="sell", qty=100)
+    assert order.status == "pending"
+
+
+def test_pending_sells_reserve_shares(engine, session):
+    acct = make_account(session)
+    session.add(Position(account_id=acct.id, symbol="SPY", qty=100,
+                         avg_cost=Decimal("100"), realized_pnl=Decimal("0")))
+    session.flush()
+    assert place(engine, session, acct, side="sell", qty=60).status == "pending"
+    second = place(engine, session, acct, side="sell", qty=60)
+    assert second.status == "rejected"
+    assert second.reject_reason == "insufficient shares"

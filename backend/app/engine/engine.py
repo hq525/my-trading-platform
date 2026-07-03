@@ -67,7 +67,8 @@ class TradingEngine:
                     f"insufficient cash: need {cost}, available {available}")
             order.reserved_cash = cost
         else:
-            if qty > self.available_qty(session, account, order.symbol):
+            if qty > self.available_qty(session, account, order.symbol,
+                                        exclude_order_id=order.id):
                 return self.reject_order(session, order, "insufficient shares")
 
         return order
@@ -98,13 +99,17 @@ class TradingEngine:
             Order.side == "buy")).all()
         return account.cash - sum(reserved, Decimal("0"))
 
-    def available_qty(self, session, account: Account, symbol: str) -> int:
+    def available_qty(self, session, account: Account, symbol: str,
+                      exclude_order_id: int | None = None) -> int:
         pos = session.scalar(select(Position).where(
             Position.account_id == account.id, Position.symbol == symbol))
         held = pos.qty if pos is not None else 0
-        pending_sells = session.scalars(select(Order.qty).where(
+        stmt = select(Order.qty).where(
             Order.account_id == account.id,
             Order.symbol == symbol,
             Order.status == "pending",
-            Order.side == "sell")).all()
+            Order.side == "sell")
+        if exclude_order_id is not None:
+            stmt = stmt.where(Order.id != exclude_order_id)
+        pending_sells = session.scalars(stmt).all()
         return held - sum(pending_sells)

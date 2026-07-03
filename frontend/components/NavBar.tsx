@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { api } from "@/lib/api";
 
 const links = [
   { href: "/", label: "Dashboard" },
@@ -30,6 +31,16 @@ export function NavBar() {
             {l.label}
           </Link>
         ))}
+        <button
+          onClick={() => {
+            void api.logout().then(() => {
+              window.location.href = "/login";
+            });
+          }}
+          className="ml-auto rounded px-3 py-1.5 text-sm text-gray-400 hover:text-gray-200"
+        >
+          Log out
+        </button>
       </nav>
     </header>
   );

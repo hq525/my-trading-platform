@@ -88,6 +88,9 @@ Deliberately simple — appropriate for swing trading, no order-book realism:
 
 - **Market order, market open:** fills immediately at the latest trade price.
 - **Market order, market closed:** queues; fills at the next session's opening price.
+  If an overnight gap makes the fill price unaffordable (cost exceeds the order's
+  reservation plus free cash), the order is rejected at fill time — cash never
+  goes negative.
 - **Limit order:** pending; a scheduler job re-checks every ~2 minutes during
   market hours. A buy fills when market price ≤ limit; a sell fills when market
   price ≥ limit. Fill price = the limit price.

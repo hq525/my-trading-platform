@@ -1,0 +1,28 @@
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.api.deps import get_deps, require_auth
+from app.api.schemas import BarOut, QuoteOut
+from app.marketdata.base import MarketDataError, UnknownSymbolError
+
+router = APIRouter(dependencies=[Depends(require_auth)])
+
+
+@router.get("/market/quote/{symbol}", response_model=QuoteOut)
+def quote(symbol: str, deps=Depends(get_deps)):
+    try:
+        q = deps.market_data.get_quote(symbol.upper())
+    except UnknownSymbolError:
+        raise HTTPException(404, f"unknown symbol: {symbol.upper()}")
+    except MarketDataError:
+        raise HTTPException(503, "market data unavailable")
+    return QuoteOut(symbol=q.symbol, price=q.price, as_of=q.as_of)
+
+
+@router.get("/market/bars/{symbol}", response_model=list[BarOut])
+def bars(symbol: str, limit: int = 200, deps=Depends(get_deps)):
+    try:
+        return deps.market_data.get_bars(symbol.upper(), "1D", limit)
+    except UnknownSymbolError:
+        raise HTTPException(404, f"unknown symbol: {symbol.upper()}")
+    except MarketDataError:
+        raise HTTPException(503, "market data unavailable")

@@ -1,45 +1,12 @@
-import asyncio
-import pytest
 from decimal import Decimal
 from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
-from fastapi.testclient import TestClient
-import httpx
-
 from app.config import Settings
-
-
-# Monkey-patch ASGITransport to work with sync httpx.Client
-_original_asgi_transport_init = httpx.ASGITransport.__init__
-
-def _patched_asgi_transport_init(self, app, client_class=None):
-    _original_asgi_transport_init(self, app, client_class)
-    # Add sync handle_request method
-    if not hasattr(self, 'handle_request'):
-        original_handle_async = self.handle_async_request
-        def handle_request(request):
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                response = loop.run_until_complete(original_handle_async(request))
-                # Convert the async stream to sync stream
-                if hasattr(response.stream, 'read'):
-                    return response
-                # If it's an AsyncByteStream, we need to make it sync
-                try:
-                    from httpx._content import ByteStream
-                    content = loop.run_until_complete(response.aread())
-                    response.stream = ByteStream(content)
-                except:
-                    pass
-                return response
-            finally:
-                loop.close()
-        self.handle_request = handle_request
-
-httpx.ASGITransport.__init__ = _patched_asgi_transport_init
 from app.db import Base, make_session_factory
 from app.engine.engine import TradingEngine
 from app.engine.sim_adapter import SimAdapter

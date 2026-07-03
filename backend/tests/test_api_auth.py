@@ -1,16 +1,13 @@
-def test_health_is_open(client):
-    import httpx
+from fastapi.testclient import TestClient
 
-    fresh = httpx.Client(transport=httpx.ASGITransport(app=client.app),
-                         base_url="http://test")
+
+def test_health_is_open(client):
+    fresh = TestClient(client.app)
     assert fresh.get("/api/health").status_code == 200
 
 
 def test_protected_route_requires_login(client):
-    import httpx
-
-    fresh = httpx.Client(transport=httpx.ASGITransport(app=client.app),
-                         base_url="http://test")
+    fresh = TestClient(client.app)
     assert fresh.get("/api/accounts").status_code == 401
 
 

@@ -41,7 +41,11 @@ export function OrdersTable({
         {orders.map((o) => (
           <tr key={o.id} className="border-b border-gray-900">
             <td className="py-2 text-gray-400">{formatDateTime(o.placed_at)}</td>
-            <td className="py-2 font-medium text-gray-100">{o.symbol}</td>
+            <td className="py-2 font-medium">
+              <a href={`/trade?symbol=${o.symbol}`} className="text-gray-100 hover:underline">
+                {o.symbol}
+              </a>
+            </td>
             <td className={`py-2 ${o.side === "buy" ? "text-emerald-400" : "text-red-400"}`}>
               {o.side}
             </td>

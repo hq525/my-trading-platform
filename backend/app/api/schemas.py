@@ -80,3 +80,58 @@ class SnapshotOut(BaseModel):
 
 class NoteIn(BaseModel):
     text: str
+
+
+class QuoteOut(BaseModel):
+    symbol: str
+    price: Money
+    as_of: datetime
+
+
+class BarOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    timestamp: datetime
+    open: Money
+    high: Money
+    low: Money
+    close: Money
+    volume: int
+
+
+class TradeOut(BaseModel):
+    order_id: int
+    symbol: str
+    side: str
+    qty: int
+    price: Money
+    commission: Money
+    realized_pnl: Money | None
+    filled_at: datetime
+    note: str | None
+
+
+class StatsOut(BaseModel):
+    closed_trades: int
+    wins: int
+    win_rate: float | None
+    avg_gain: Money | None
+    avg_loss: Money | None
+
+
+class StrategyOut(BaseModel):
+    name: str
+    schedule: str
+    enabled: bool
+    account_id: int
+
+
+class RunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    strategy_name: str
+    started_at: datetime
+    finished_at: datetime | None
+    status: str
+    detail: str

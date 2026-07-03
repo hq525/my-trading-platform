@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
-from app.api import accounts, auth
+from app.api import accounts, auth, orders
 from app.config import Settings
 from app.db import init_db, make_engine, make_session_factory
 from app.engine.calendar import MarketCalendar
@@ -79,4 +79,5 @@ def create_app(deps: AppDeps | None = None, start_scheduler: bool = True) -> Fas
 
     app.include_router(auth.router, prefix="/api")
     app.include_router(accounts.router, prefix="/api")
+    app.include_router(orders.router, prefix="/api")
     return app

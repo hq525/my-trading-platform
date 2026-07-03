@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { api } from "@/lib/api";
+import { AccountSwitcher } from "@/components/AccountSwitcher";
 
 const links = [
   { href: "/", label: "Dashboard" },
@@ -31,16 +32,19 @@ export function NavBar() {
             {l.label}
           </Link>
         ))}
-        <button
-          onClick={() => {
-            void api.logout().then(() => {
-              window.location.href = "/login";
-            });
-          }}
-          className="ml-auto rounded px-3 py-1.5 text-sm text-gray-400 hover:text-gray-200"
-        >
-          Log out
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <AccountSwitcher />
+          <button
+            onClick={() => {
+              void api.logout().then(() => {
+                window.location.href = "/login";
+              });
+            }}
+            className="rounded px-3 py-1.5 text-sm text-gray-400 hover:text-gray-200"
+          >
+            Log out
+          </button>
+        </div>
       </nav>
     </header>
   );

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { CandleChart } from "@/components/CandleChart";
+import { OrderTicket } from "@/components/OrderTicket";
 import { QuoteBadge } from "@/components/QuoteBadge";
 import { api } from "@/lib/api";
 
@@ -63,7 +64,9 @@ function TradeContent() {
             </div>
           )}
         </section>
-        <aside>{/* ORDER TICKET SLOT */}</aside>
+        <aside>
+          <OrderTicket symbol={symbol} quotePrice={quote.data?.price} />
+        </aside>
       </div>
     </div>
   );

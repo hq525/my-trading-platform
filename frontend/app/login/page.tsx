@@ -1,16 +1,16 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [password, setPassword] = useState("");
   const login = useMutation({
     mutationFn: (pw: string) => api.login(pw),
-    onSuccess: () => router.push("/"),
+    onSuccess: () => {
+      window.location.href = "/";
+    },
   });
 
   return (

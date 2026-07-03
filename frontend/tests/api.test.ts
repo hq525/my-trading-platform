@@ -38,6 +38,19 @@ it("does not redirect on 401 from the login page itself", async () => {
   expect(fake.href).toBe("");
 });
 
+it("falls back to statusText when detail is not a string", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () =>
+    new Response(JSON.stringify({ detail: [{ loc: ["body"], msg: "invalid" }] }), {
+      status: 422,
+      statusText: "Unprocessable Entity",
+      headers: { "Content-Type": "application/json" },
+    }),
+  ));
+  const err = await api.accounts().catch((e) => e);
+  expect(err).toBeInstanceOf(ApiError);
+  expect(err.message).toBe("Unprocessable Entity");
+});
+
 it("POSTs JSON bodies with content-type", async () => {
   const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
   vi.stubGlobal("fetch", fetchMock);

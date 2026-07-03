@@ -84,6 +84,15 @@ it("shows rejection reasons from the backend", async () => {
   expect(body.limit_price).toBe("90");
 });
 
+it("disables submit for an unparsable limit price", async () => {
+  setup("100");
+  await userEvent.click(screen.getByRole("radio", { name: /limit/i }));
+  await userEvent.type(screen.getByLabelText(/limit price/i), "9..5");
+  await userEvent.clear(screen.getByLabelText(/quantity/i));
+  await userEvent.type(screen.getByLabelText(/quantity/i), "5");
+  expect(screen.getByRole("button", { name: /place order/i })).toBeDisabled();
+});
+
 it("clears the previous result when a new submit starts", async () => {
   vi.mocked(api.placeOrder).mockResolvedValueOnce({
     id: 9, account_id: 1, symbol: "SPY", side: "buy", order_type: "market",

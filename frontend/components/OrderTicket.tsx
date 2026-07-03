@@ -62,7 +62,7 @@ export function OrderTicket({
     qtyNum > 0 &&
     !insufficient &&
     !place.isPending &&
-    (type === "market" || limitPrice.trim().length > 0);
+    (type === "market" || (limitPrice.trim().length > 0 && cost !== null));
 
   return (
     <div className="space-y-3 rounded-lg border border-gray-800 bg-gray-900 p-4">

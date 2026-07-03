@@ -5,3 +5,5 @@ __pycache__/
 .env
 .pytest_cache/
 node_modules/
+*.db-wal
+*.db-shm

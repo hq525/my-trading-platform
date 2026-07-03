@@ -19,6 +19,10 @@ import { AccountProvider } from "@/app/account-context";
 import { OrderTicket } from "@/components/OrderTicket";
 import { api } from "@/lib/api";
 
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
 const manual = { id: 1, name: "manual", kind: "manual" as const, cash: "1000", starting_cash: "1000" };
 
 function setup(quotePrice?: string) {
@@ -58,6 +62,7 @@ it("submits a market order with an idempotency key and shows the result", async 
   expect(body).toMatchObject({ symbol: "SPY", side: "buy", order_type: "market", qty: 5, tif: "day" });
   expect(typeof body.idempotency_key).toBe("string");
   expect(body.idempotency_key!.length).toBeGreaterThan(10);
+  expect(body).not.toHaveProperty("limit_price");
   expect(await screen.findByText(/filled/i)).toBeInTheDocument();
 });
 
@@ -74,4 +79,21 @@ it("shows rejection reasons from the backend", async () => {
   await userEvent.type(screen.getByLabelText(/quantity/i), "5");
   await userEvent.click(screen.getByRole("button", { name: /place order/i }));
   expect(await screen.findByText(/market data unavailable/i)).toBeInTheDocument();
+  const [, body] = vi.mocked(api.placeOrder).mock.calls[0];
+  expect(body.order_type).toBe("limit");
+  expect(body.limit_price).toBe("90");
+});
+
+it("clears the previous result when a new submit starts", async () => {
+  vi.mocked(api.placeOrder).mockResolvedValueOnce({
+    id: 9, account_id: 1, symbol: "SPY", side: "buy", order_type: "market",
+    tif: "day", qty: 1, limit_price: null, status: "filled", reject_reason: null,
+    placed_at: "2026-07-02T15:00:00",
+  });
+  setup("100");
+  await userEvent.click(screen.getByRole("button", { name: /place order/i }));
+  expect(await screen.findByText(/filled/i)).toBeInTheDocument();
+  vi.mocked(api.placeOrder).mockImplementation(() => new Promise(() => {}));
+  await userEvent.click(screen.getByRole("button", { name: /place order/i }));
+  expect(screen.queryByText(/filled/i)).not.toBeInTheDocument();
 });

@@ -124,7 +124,8 @@ export function OrderTicket({
       </div>
 
       <button
-        onClick={() =>
+        onClick={() => {
+          setResult(null);
           place.mutate({
             symbol,
             side,
@@ -133,8 +134,8 @@ export function OrderTicket({
             tif,
             ...(type === "limit" ? { limit_price: limitPrice } : {}),
             idempotency_key: crypto.randomUUID(),
-          })
-        }
+          });
+        }}
         disabled={!canSubmit}
         className={`w-full rounded px-3 py-2 font-medium text-white disabled:opacity-50 ${
           side === "buy" ? "bg-emerald-700 hover:bg-emerald-600" : "bg-red-800 hover:bg-red-700"

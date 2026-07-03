@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
+
+from app.jobs import build_scheduler
 
 from app.api import accounts, auth, journal, market, orders, strategies
 from app.config import Settings
@@ -67,7 +70,17 @@ def create_app(deps: AppDeps | None = None, start_scheduler: bool = True) -> Fas
     deps.runner.discover()
     deps.runner.sync_accounts()
 
-    app = FastAPI(title="Paper Trading Platform")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        scheduler = None
+        if start_scheduler:
+            scheduler = build_scheduler(deps)
+            scheduler.start()
+        yield
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
+
+    app = FastAPI(title="Paper Trading Platform", lifespan=lifespan)
     app.state.deps = deps
     app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000"],
                        allow_credentials=True, allow_methods=["*"],

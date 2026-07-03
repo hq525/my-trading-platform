@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import logging
 import traceback
 from decimal import Decimal
 from pathlib import Path
@@ -15,6 +16,8 @@ from app.strategy.base import Context, Strategy
 from app.timeutil import utcnow
 
 NY_TZ = ZoneInfo("America/New_York")
+
+log = logging.getLogger(__name__)
 
 
 class StrategyRunner:
@@ -35,7 +38,11 @@ class StrategyRunner:
             spec = importlib.util.spec_from_file_location(
                 f"user_strategies_{path.stem}", path)
             module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            try:
+                spec.loader.exec_module(module)
+            except Exception:
+                log.exception("skipping strategy file %s: import failed", path.name)
+                continue
             for obj in vars(module).values():
                 if (isinstance(obj, type) and issubclass(obj, Strategy)
                         and obj is not Strategy):
@@ -84,9 +91,13 @@ class StrategyRunner:
 
     def register_jobs(self, scheduler) -> None:
         for name, cls in self.strategies.items():
-            trigger = (CronTrigger(day_of_week="mon-fri", hour=16, minute=5,
-                                   timezone=NY_TZ)
-                       if cls.schedule == "daily_after_close"
-                       else CronTrigger.from_crontab(cls.schedule, timezone=NY_TZ))
+            try:
+                trigger = (CronTrigger(day_of_week="mon-fri", hour=16, minute=5,
+                                       timezone=NY_TZ)
+                           if cls.schedule == "daily_after_close"
+                           else CronTrigger.from_crontab(cls.schedule, timezone=NY_TZ))
+            except ValueError:
+                log.exception("skipping strategy %s: invalid schedule %r", name, cls.schedule)
+                continue
             scheduler.add_job(self.run_strategy, trigger, args=[name],
                               id=f"strategy:{name}", replace_existing=True)

@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app.engine.engine import TradingEngine
 from app.marketdata.base import MarketDataError
-from app.models import Order
+from app.models import Account, Order
 from app.timeutil import utcnow
 
 
@@ -48,7 +48,13 @@ class SimAdapter:
         if not self.calendar.is_open(now):
             return
 
+        # Flush this session's own expiry updates from the loop above so the
+        # refresh below re-reads them instead of clobbering them back to
+        # "pending" (refresh() discards unflushed local changes).
+        session.flush()
+
         for order in pending:
+            session.refresh(order)
             if order.status != "pending":
                 continue
             if order.order_type == "market":
@@ -63,6 +69,16 @@ class SimAdapter:
             # Spec: reject rather than fill at a stale/unknown price.
             self.engine.reject_order(session, order, "market data unavailable")
             return
+        if order.side == "buy":
+            account = session.get(Account, order.account_id)
+            cost = quote.price * order.qty + account.commission
+            spendable = (self.engine.available_cash(session, account)
+                         + order.reserved_cash)
+            if cost > spendable:
+                self.engine.reject_order(
+                    session, order,
+                    f"insufficient cash at fill: need {cost}, available {spendable}")
+                return
         self.engine.apply_fill(session, order, quote.price)
 
     def _check_limit(self, session, order: Order) -> None:

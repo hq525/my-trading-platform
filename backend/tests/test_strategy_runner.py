@@ -2,6 +2,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.engine.engine import TradingEngine
 from app.engine.sim_adapter import SimAdapter
@@ -90,3 +91,33 @@ def test_sync_accounts_is_idempotent(runner, session_factory):
     runner.sync_accounts()
     with session_factory() as s:
         assert s.query(Account).filter_by(name="strategy:BuyOne").count() == 1
+
+
+def test_broken_strategy_file_is_skipped(tmp_path, session_factory):
+    (tmp_path / "broken.py").write_text("def broken(:\n")
+    (tmp_path / "buy_one.py").write_text(GOOD_STRATEGY)
+    md = FakeMarketData()
+    md.set_quote("SPY", "100")
+    engine = TradingEngine(md)
+    execution = SimAdapter(engine, md, FakeCalendar(open_=True))
+    r = StrategyRunner(Path(tmp_path), session_factory, execution, md,
+                       FakeCalendar(), Decimal("100000"))
+    r.discover()
+    assert set(r.strategies) == {"BuyOne"}
+
+
+class _GoodSchedule:
+    schedule = "daily_after_close"
+
+
+class _BadSchedule:
+    schedule = "not a cron"
+
+
+def test_invalid_cron_schedule_is_skipped(runner):
+    runner.strategies = {"Good": _GoodSchedule, "Bad": _BadSchedule}
+    scheduler = BackgroundScheduler()
+    runner.register_jobs(scheduler)
+    job_ids = {job.id for job in scheduler.get_jobs()}
+    assert "strategy:Good" in job_ids
+    assert "strategy:Bad" not in job_ids

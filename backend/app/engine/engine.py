@@ -5,7 +5,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.marketdata.base import MarketDataError, UnknownSymbolError
-from app.models import Account, Order, Position
+from app.models import Account, Fill, Order, Position
 from app.timeutil import utcnow
 
 
@@ -113,3 +113,39 @@ class TradingEngine:
             stmt = stmt.where(Order.id != exclude_order_id)
         pending_sells = session.scalars(stmt).all()
         return held - sum(pending_sells)
+
+    def apply_fill(self, session, order: Order, price: Decimal) -> Fill:
+        if order.status != "pending":
+            raise InvalidOrderState(f"cannot fill order in status {order.status}")
+        account = session.get(Account, order.account_id)
+        commission = account.commission
+        fill = Fill(order_id=order.id, price=price, qty=order.qty,
+                    commission=commission, filled_at=utcnow())
+        pos = self._get_or_create_position(session, order.account_id, order.symbol)
+        if order.side == "buy":
+            account.cash -= price * order.qty + commission
+            new_qty = pos.qty + order.qty
+            pos.avg_cost = ((pos.avg_cost * pos.qty + price * order.qty) / new_qty
+                            ).quantize(Decimal("0.0001"))
+            pos.qty = new_qty
+        else:
+            pnl = ((price - pos.avg_cost) * order.qty - commission
+                   ).quantize(Decimal("0.0001"))
+            fill.realized_pnl = pnl
+            pos.realized_pnl += pnl
+            pos.qty -= order.qty
+            account.cash += price * order.qty - commission
+        order.status = "filled"
+        session.add(fill)
+        session.flush()
+        return fill
+
+    def _get_or_create_position(self, session, account_id: int, symbol: str) -> Position:
+        pos = session.scalar(select(Position).where(
+            Position.account_id == account_id, Position.symbol == symbol))
+        if pos is None:
+            pos = Position(account_id=account_id, symbol=symbol,
+                           qty=0, avg_cost=Decimal("0"), realized_pnl=Decimal("0"))
+            session.add(pos)
+            session.flush()
+        return pos

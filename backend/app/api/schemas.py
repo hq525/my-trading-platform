@@ -13,6 +13,7 @@ def _serialize_money(d: Decimal) -> str:
     return s
 
 Money = Annotated[Decimal, PlainSerializer(_serialize_money, return_type=str, when_used="json")]
+Qty = Annotated[Decimal, PlainSerializer(_serialize_money, return_type=str, when_used="json")]
 
 
 class LoginIn(BaseModel):
@@ -23,7 +24,7 @@ class OrderIn(BaseModel):
     symbol: str
     side: Literal["buy", "sell"]
     order_type: Literal["market", "limit"]
-    qty: int
+    qty: Decimal
     tif: Literal["day", "gtc"] = "day"
     limit_price: Decimal | None = None
     idempotency_key: str | None = None
@@ -38,7 +39,7 @@ class OrderOut(BaseModel):
     side: str
     order_type: str
     tif: str
-    qty: int
+    qty: Qty
     limit_price: Money | None
     status: str
     reject_reason: str | None
@@ -57,7 +58,7 @@ class AccountOut(BaseModel):
 
 class PositionOut(BaseModel):
     symbol: str
-    qty: int
+    qty: Qty
     avg_cost: Money
     last_price: Money
     market_value: Money
@@ -103,7 +104,7 @@ class TradeOut(BaseModel):
     order_id: int
     symbol: str
     side: str
-    qty: int
+    qty: Qty
     price: Money
     commission: Money
     realized_pnl: Money | None

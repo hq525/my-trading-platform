@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
+from app.assets import is_crypto_symbol
 from app.config import Settings
 from app.db import Base, make_session_factory
 from app.engine.engine import TradingEngine
@@ -38,13 +39,15 @@ def client(session_factory, tmp_path):
     fake_md.set_quote("SPY", "100")
     fake_cal = FakeCalendar(open_=True)
     engine = TradingEngine(fake_md)
-    execution = SimAdapter(engine, fake_md, fake_cal)
+    execution = SimAdapter(engine, fake_md, fake_cal,
+                           owns_symbol=lambda s: not is_crypto_symbol(s))
 
     crypto_fake_md = FakeMarketData()
     crypto_fake_md.set_quote("BTC-USD", "65000")
     crypto_fake_cal = FakeCalendar(open_=True)
     crypto_engine = TradingEngine(crypto_fake_md)
-    crypto_execution = SimAdapter(crypto_engine, crypto_fake_md, crypto_fake_cal)
+    crypto_execution = SimAdapter(crypto_engine, crypto_fake_md, crypto_fake_cal,
+                                  owns_symbol=is_crypto_symbol)
 
     settings = Settings(password="pw", secret_key="test-secret")
     strategies_dir = tmp_path / "strategies"

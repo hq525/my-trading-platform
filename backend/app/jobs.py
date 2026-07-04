@@ -15,12 +15,13 @@ NY_TZ = ZoneInfo("America/New_York")
 def run_process_pending(deps) -> None:
     with deps.session_factory() as session:
         deps.execution.process_pending(session)
+        deps.crypto_execution.process_pending(session)
         session.commit()
 
 
 def run_snapshots(deps) -> None:
     with deps.session_factory() as session:
-        take_snapshots(session, deps.market_data, deps.calendar)
+        take_snapshots(session, deps.market_data_for_symbol)
         session.commit()
 
 

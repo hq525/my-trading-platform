@@ -27,8 +27,8 @@ def account_detail(account_id: int, session=Depends(get_session),
                    deps=Depends(get_deps)):
     account = _account_or_404(session, account_id)
     try:
-        values = position_values(session, account, deps.market_data)
-        equity = account_equity(session, account, deps.market_data)
+        values = position_values(session, account, deps.market_data_for_symbol)
+        equity = account_equity(session, account, deps.market_data_for_symbol)
     except MarketDataError:
         raise HTTPException(503, "market data unavailable")
     return AccountDetailOut(

@@ -64,12 +64,14 @@ def build_deps(settings: Settings | None = None, market_data=None,
         market_data = MarketDataService(providers)
     calendar = calendar or MarketCalendar()
     engine = TradingEngine(market_data)
-    execution = SimAdapter(engine, market_data, calendar)
+    execution = SimAdapter(engine, market_data, calendar,
+                           owns_symbol=lambda s: not is_crypto_symbol(s))
 
     crypto_calendar = CryptoCalendar()
     crypto_market_data = MarketDataService([CoinbaseData(), BinanceData()])
     crypto_engine = TradingEngine(crypto_market_data)
-    crypto_execution = SimAdapter(crypto_engine, crypto_market_data, crypto_calendar)
+    crypto_execution = SimAdapter(crypto_engine, crypto_market_data, crypto_calendar,
+                                  owns_symbol=is_crypto_symbol)
 
     runner = StrategyRunner(STRATEGIES_DIR, session_factory, execution,
                             market_data, calendar, settings.starting_cash)

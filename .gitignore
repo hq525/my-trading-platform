@@ -7,3 +7,5 @@ __pycache__/
 node_modules/
 *.db-wal
 *.db-shm
+.next/
+*.tsbuildinfo

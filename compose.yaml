@@ -1,0 +1,23 @@
+services:
+  backend:
+    build: ./backend
+    env_file: backend/.env
+    environment:
+      PT_DB_PATH: /data/paper_trading.db  # wins over any .env value; keeps the DB on the volume
+    volumes:
+      - db-data:/data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        BACKEND_URL: http://backend:8000  # baked at build time (standalone serializes next.config)
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  db-data:

@@ -6,6 +6,7 @@ import { useAccount } from "@/app/account-context";
 import { StatCard } from "@/components/StatCard";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import { formatQty, isCryptoSymbol } from "@/lib/qty";
 import { formatUsd, isNeg } from "@/lib/money";
 
 export default function JournalPage() {
@@ -59,7 +60,10 @@ export default function JournalPage() {
                 {t.side}
               </span>
               <span className="font-medium text-gray-100">
-                {t.qty} {t.symbol} @ {formatUsd(t.price)}
+                {formatQty(t.qty)} {t.symbol} @ {formatUsd(t.price)}
+              </span>
+              <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] uppercase text-gray-400">
+                {isCryptoSymbol(t.symbol) ? "Crypto" : "Stock"}
               </span>
               {t.realized_pnl !== null && (
                 <span className={isNeg(t.realized_pnl) ? "text-red-400" : "text-emerald-400"}>

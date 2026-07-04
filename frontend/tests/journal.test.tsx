@@ -21,12 +21,12 @@ beforeEach(() => {
   vi.mocked(api.accounts).mockResolvedValue([manual]);
   vi.mocked(api.journal).mockResolvedValue([
     {
-      order_id: 5, symbol: "SPY", side: "sell", qty: 5, price: "120",
+      order_id: 5, symbol: "SPY", side: "sell", qty: "5", price: "120",
       commission: "0", realized_pnl: "100", filled_at: "2026-07-02T15:30:00",
       note: "took profits into strength",
     },
     {
-      order_id: 4, symbol: "SPY", side: "buy", qty: 10, price: "100",
+      order_id: 4, symbol: "SPY", side: "buy", qty: "10", price: "100",
       commission: "0", realized_pnl: null, filled_at: "2026-07-01T15:30:00",
       note: null,
     },
@@ -59,4 +59,15 @@ it("saves an edited note", async () => {
   await userEvent.type(screen.getByRole("textbox"), "breakout entry");
   await userEvent.click(screen.getByRole("button", { name: /save/i }));
   await waitFor(() => expect(api.saveNote).toHaveBeenCalledWith(4, "breakout entry"));
+});
+
+it("tags each trade with its asset class", async () => {
+  renderWithClient(
+    <AccountProvider>
+      <JournalPage />
+    </AccountProvider>,
+  );
+  await screen.findByText("took profits into strength");
+  const tags = screen.getAllByText("Stock");
+  expect(tags).toHaveLength(2); // both mocked trades are SPY
 });

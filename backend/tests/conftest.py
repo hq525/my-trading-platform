@@ -52,8 +52,15 @@ def client(session_factory, tmp_path):
     settings = Settings(password="pw", secret_key="test-secret")
     strategies_dir = tmp_path / "strategies"
     strategies_dir.mkdir()
-    runner = StrategyRunner(Path(strategies_dir), session_factory, execution,
-                            fake_md, fake_cal, settings.starting_cash)
+
+    def execution_for_symbol(symbol: str):
+        return crypto_execution if is_crypto_symbol(symbol) else execution
+
+    def market_data_for_symbol(symbol: str):
+        return crypto_fake_md if is_crypto_symbol(symbol) else fake_md
+
+    runner = StrategyRunner(Path(strategies_dir), session_factory, execution_for_symbol,
+                            market_data_for_symbol, settings.starting_cash)
     deps = AppDeps(settings=settings, session_factory=session_factory,
                    market_data=fake_md, calendar=fake_cal, engine=engine,
                    execution=execution, runner=runner,

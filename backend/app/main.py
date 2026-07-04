@@ -73,8 +73,14 @@ def build_deps(settings: Settings | None = None, market_data=None,
     crypto_execution = SimAdapter(crypto_engine, crypto_market_data, crypto_calendar,
                                   owns_symbol=is_crypto_symbol)
 
-    runner = StrategyRunner(STRATEGIES_DIR, session_factory, execution,
-                            market_data, calendar, settings.starting_cash)
+    def execution_for_symbol(symbol: str) -> SimAdapter:
+        return crypto_execution if is_crypto_symbol(symbol) else execution
+
+    def market_data_for_symbol(symbol: str):
+        return crypto_market_data if is_crypto_symbol(symbol) else market_data
+
+    runner = StrategyRunner(STRATEGIES_DIR, session_factory, execution_for_symbol,
+                            market_data_for_symbol, settings.starting_cash)
     return AppDeps(settings=settings, session_factory=session_factory,
                    market_data=market_data, calendar=calendar, engine=engine,
                    execution=execution, runner=runner,

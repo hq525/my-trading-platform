@@ -28,6 +28,16 @@ class Exploder(Strategy):
 '''
 
 
+def _stock_only(execution=None, market_data=None):
+    def execution_for_symbol(symbol):
+        return execution
+
+    def market_data_for_symbol(symbol):
+        return market_data
+
+    return execution_for_symbol, market_data_for_symbol
+
+
 @pytest.fixture
 def runner(tmp_path, session_factory):
     (tmp_path / "buy_one.py").write_text(GOOD_STRATEGY)
@@ -36,8 +46,9 @@ def runner(tmp_path, session_factory):
     md.set_quote("SPY", "100")
     engine = TradingEngine(md)
     execution = SimAdapter(engine, md, FakeCalendar(open_=True))
-    r = StrategyRunner(Path(tmp_path), session_factory, execution, md,
-                       FakeCalendar(), Decimal("100000"))
+    execution_for_symbol, market_data_for_symbol = _stock_only(execution, md)
+    r = StrategyRunner(Path(tmp_path), session_factory, execution_for_symbol,
+                       market_data_for_symbol, Decimal("100000"))
     r.discover()
     r.sync_accounts()
     return r
@@ -100,8 +111,9 @@ def test_broken_strategy_file_is_skipped(tmp_path, session_factory):
     md.set_quote("SPY", "100")
     engine = TradingEngine(md)
     execution = SimAdapter(engine, md, FakeCalendar(open_=True))
-    r = StrategyRunner(Path(tmp_path), session_factory, execution, md,
-                       FakeCalendar(), Decimal("100000"))
+    execution_for_symbol, market_data_for_symbol = _stock_only(execution, md)
+    r = StrategyRunner(Path(tmp_path), session_factory, execution_for_symbol,
+                       market_data_for_symbol, Decimal("100000"))
     r.discover()
     assert set(r.strategies) == {"BuyOne"}
 
@@ -121,3 +133,45 @@ def test_invalid_cron_schedule_is_skipped(runner):
     job_ids = {job.id for job in scheduler.get_jobs()}
     assert "strategy:Good" in job_ids
     assert "strategy:Bad" not in job_ids
+
+
+def test_strategy_can_trade_both_stock_and_crypto_symbols(tmp_path, session_factory):
+    mixed_strategy = '''
+from decimal import Decimal
+from app.strategy.base import Strategy
+
+class MixedTrader(Strategy):
+    def run(self, ctx):
+        ctx.buy("SPY", qty=1)
+        ctx.buy("BTC-USD", qty=Decimal("0.01"))
+'''
+    (tmp_path / "mixed.py").write_text(mixed_strategy)
+    md = FakeMarketData()
+    md.set_quote("SPY", "100")
+    crypto_md = FakeMarketData()
+    crypto_md.set_quote("BTC-USD", "65000")
+    engine = TradingEngine(md)
+    execution = SimAdapter(engine, md, FakeCalendar(open_=True))
+    crypto_engine = TradingEngine(crypto_md)
+    crypto_execution = SimAdapter(crypto_engine, crypto_md, FakeCalendar(open_=True))
+
+    def execution_for_symbol(symbol):
+        return crypto_execution if "-" in symbol else execution
+
+    def market_data_for_symbol(symbol):
+        return crypto_md if "-" in symbol else md
+
+    r = StrategyRunner(Path(tmp_path), session_factory, execution_for_symbol,
+                       market_data_for_symbol, Decimal("100000"))
+    r.discover()
+    r.sync_accounts()
+    with session_factory() as s:
+        state = s.query(StrategyState).filter_by(name="MixedTrader").one()
+        state.enabled = True
+        s.commit()
+    run = r.run_strategy("MixedTrader")
+    assert run.status == "ok"
+    assert run.detail == "orders placed: 2"
+    with session_factory() as s:
+        symbols = {o.symbol for o in s.query(Order).all()}
+        assert symbols == {"SPY", "BTC-USD"}

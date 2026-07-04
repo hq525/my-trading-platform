@@ -33,8 +33,15 @@ def deps(session_factory, tmp_path):
 
     strategies_dir = tmp_path / "strategies"
     strategies_dir.mkdir()
-    runner = StrategyRunner(Path(strategies_dir), session_factory, execution,
-                            md, cal, Decimal("100000"))
+
+    def execution_for_symbol(symbol: str):
+        return crypto_execution if is_crypto_symbol(symbol) else execution
+
+    def market_data_for_symbol(symbol: str):
+        return crypto_md if is_crypto_symbol(symbol) else md
+
+    runner = StrategyRunner(Path(strategies_dir), session_factory, execution_for_symbol,
+                            market_data_for_symbol, Decimal("100000"))
     with session_factory() as s:
         make_account(s)
         s.commit()

@@ -1,3 +1,4 @@
+import { formatQty, isCryptoSymbol } from "@/lib/qty";
 import { formatUsd, isNeg } from "@/lib/money";
 import type { PositionValue } from "@/lib/types";
 
@@ -15,6 +16,12 @@ export function PositionsTable({ positions }: { positions: PositionValue[] }) {
   if (positions.length === 0) {
     return <p className="text-sm text-gray-500">No open positions.</p>;
   }
+  const stocks = positions.filter((p) => !isCryptoSymbol(p.symbol));
+  const crypto = positions.filter((p) => isCryptoSymbol(p.symbol));
+  const groups: { label: string; rows: PositionValue[] }[] = [
+    ...(stocks.length > 0 ? [{ label: "Stocks", rows: stocks }] : []),
+    ...(crypto.length > 0 ? [{ label: "Crypto", rows: crypto }] : []),
+  ];
   return (
     <table className="w-full text-sm tabular-nums">
       <thead>
@@ -28,19 +35,26 @@ export function PositionsTable({ positions }: { positions: PositionValue[] }) {
           <th className="py-2 text-right">Realized</th>
         </tr>
       </thead>
-      <tbody>
-        {positions.map((p) => (
-          <tr key={p.symbol} className="border-b border-gray-900">
-            <td className="py-2 font-medium text-gray-100">{p.symbol}</td>
-            <td className="py-2 text-right">{p.qty}</td>
-            <td className="py-2 text-right">{formatUsd(p.avg_cost)}</td>
-            <td className="py-2 text-right">{formatUsd(p.last_price)}</td>
-            <td className="py-2 text-right">{formatUsd(p.market_value)}</td>
-            <td className="py-2 text-right"><Pnl value={p.unrealized_pnl} /></td>
-            <td className="py-2 text-right"><Pnl value={p.realized_pnl} /></td>
+      {groups.map((g) => (
+        <tbody key={g.label}>
+          <tr>
+            <td colSpan={7} className="pt-3 pb-1 text-xs font-semibold uppercase text-gray-500">
+              {g.label}
+            </td>
           </tr>
-        ))}
-      </tbody>
+          {g.rows.map((p) => (
+            <tr key={p.symbol} className="border-b border-gray-900">
+              <td className="py-2 font-medium text-gray-100">{p.symbol}</td>
+              <td className="py-2 text-right">{formatQty(p.qty)}</td>
+              <td className="py-2 text-right">{formatUsd(p.avg_cost)}</td>
+              <td className="py-2 text-right">{formatUsd(p.last_price)}</td>
+              <td className="py-2 text-right">{formatUsd(p.market_value)}</td>
+              <td className="py-2 text-right"><Pnl value={p.unrealized_pnl} /></td>
+              <td className="py-2 text-right"><Pnl value={p.realized_pnl} /></td>
+            </tr>
+          ))}
+        </tbody>
+      ))}
     </table>
   );
 }

@@ -1,5 +1,6 @@
 import { formatDateTime } from "@/lib/format";
 import { formatUsd } from "@/lib/money";
+import { formatQty, isCryptoSymbol } from "@/lib/qty";
 import type { Order } from "@/lib/types";
 
 const statusColor: Record<Order["status"], string> = {
@@ -45,12 +46,15 @@ export function OrdersTable({
               <a href={`/trade?symbol=${o.symbol}`} className="text-gray-100 hover:underline">
                 {o.symbol}
               </a>
+              <span className="ml-2 rounded bg-gray-800 px-1.5 py-0.5 text-[10px] uppercase text-gray-400">
+                {isCryptoSymbol(o.symbol) ? "Crypto" : "Stock"}
+              </span>
             </td>
             <td className={`py-2 ${o.side === "buy" ? "text-emerald-400" : "text-red-400"}`}>
               {o.side}
             </td>
             <td className="py-2">{o.order_type}</td>
-            <td className="py-2 text-right">{o.qty}</td>
+            <td className="py-2 text-right">{formatQty(o.qty)}</td>
             <td className="py-2 text-right">
               {o.limit_price ? formatUsd(o.limit_price) : "—"}
             </td>

@@ -60,3 +60,9 @@ it("surfaces cancel failures", async () => {
   await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
   expect(await screen.findByText(/cannot cancel order/i)).toBeInTheDocument();
 });
+
+it("tags each order with its asset class", async () => {
+  setup([pendingOrder]);
+  await screen.findByText("SPY");
+  expect(screen.getByText("Stock")).toBeInTheDocument();
+});

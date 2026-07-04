@@ -15,12 +15,13 @@ NY_TZ = ZoneInfo("America/New_York")
 def run_process_pending(deps) -> None:
     with deps.session_factory() as session:
         deps.execution.process_pending(session)
+        deps.crypto_execution.process_pending(session)
         session.commit()
 
 
 def run_snapshots(deps) -> None:
     with deps.session_factory() as session:
-        take_snapshots(session, deps.market_data, deps.calendar)
+        take_snapshots(session, deps.market_data_for_symbol)
         session.commit()
 
 
@@ -31,8 +32,7 @@ def build_scheduler(deps) -> BackgroundScheduler:
     scheduler.add_job(run_process_pending, "interval", minutes=2, args=[deps],
                       id="process_pending")
     scheduler.add_job(run_snapshots,
-                      CronTrigger(day_of_week="mon-fri", hour=16, minute=10,
-                                  timezone=NY_TZ),
+                      CronTrigger(hour=16, minute=10, timezone=NY_TZ),
                       args=[deps], id="snapshots")
     deps.runner.register_jobs(scheduler)
     return scheduler

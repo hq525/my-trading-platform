@@ -15,7 +15,8 @@ def place_order(account_id: int, body: OrderIn, session=Depends(get_session),
                 deps=Depends(get_deps)):
     if session.get(Account, account_id) is None:
         raise HTTPException(404, "no such account")
-    return deps.execution.place_order(
+    execution = deps.execution_for_symbol(body.symbol)
+    return execution.place_order(
         session, account_id=account_id, symbol=body.symbol, side=body.side,
         order_type=body.order_type, qty=body.qty, tif=body.tif,
         limit_price=body.limit_price, idempotency_key=body.idempotency_key)
@@ -34,8 +35,12 @@ def list_orders(account_id: int, status: str | None = None,
 @router.post("/orders/{order_id}/cancel", response_model=OrderOut)
 def cancel_order(order_id: int, session=Depends(get_session),
                  deps=Depends(get_deps)):
+    order = session.get(Order, order_id)
+    if order is None:
+        raise HTTPException(404, "no such order")
+    execution = deps.execution_for_symbol(order.symbol)
     try:
-        return deps.execution.cancel_order(session, order_id)
+        return execution.cancel_order(session, order_id)
     except ValueError:
         raise HTTPException(404, "no such order")
     except InvalidOrderState as e:

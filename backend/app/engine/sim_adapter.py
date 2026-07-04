@@ -19,11 +19,17 @@ class SimAdapter:
     Limit order              -> checked periodically by process_pending (Task 8).
     """
 
-    def __init__(self, engine: TradingEngine, market_data, calendar, now_fn=utcnow):
+    def __init__(self, engine: TradingEngine, market_data, calendar, now_fn=utcnow,
+                 owns_symbol=None):
         self.engine = engine
         self.market_data = market_data
         self.calendar = calendar
         self.now_fn = now_fn
+        # Two SimAdapters (stock + crypto) share one `orders` table; each must
+        # only touch orders for symbols in its own domain, or it will steal
+        # and mis-price the other pipeline's pending orders. Defaults to
+        # "owns everything" so single-pipeline callers/tests are unaffected.
+        self.owns_symbol = owns_symbol or (lambda symbol: True)
 
     def place_order(self, session, **kwargs) -> Order:
         order = self.engine.place_order(session, **kwargs)
@@ -40,6 +46,7 @@ class SimAdapter:
         now = now or self.now_fn()
         pending = session.scalars(
             select(Order).where(Order.status == "pending")).all()
+        pending = [o for o in pending if self.owns_symbol(o.symbol)]
 
         for order in pending:
             if order.tif == "day" and now >= self.calendar.expiry_time(order.placed_at):

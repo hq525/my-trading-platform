@@ -6,13 +6,16 @@ from pydantic import BaseModel, ConfigDict, PlainSerializer
 
 # All money crosses the API as strings — no float rounding in transit.
 def _serialize_money(d: Decimal) -> str:
-    # Convert to string and strip trailing zeros after decimal point
-    s = str(d)
+    # format(d, "f") forces fixed-point notation, avoiding the scientific
+    # notation str(Decimal) switches to below 1e-6 — reachable for 8dp
+    # crypto quantities even though it never was for 4dp money.
+    s = format(d, "f")
     if '.' in s:
         s = s.rstrip('0').rstrip('.')
     return s
 
 Money = Annotated[Decimal, PlainSerializer(_serialize_money, return_type=str, when_used="json")]
+Qty = Annotated[Decimal, PlainSerializer(_serialize_money, return_type=str, when_used="json")]
 
 
 class LoginIn(BaseModel):
@@ -23,7 +26,7 @@ class OrderIn(BaseModel):
     symbol: str
     side: Literal["buy", "sell"]
     order_type: Literal["market", "limit"]
-    qty: int
+    qty: Decimal
     tif: Literal["day", "gtc"] = "day"
     limit_price: Decimal | None = None
     idempotency_key: str | None = None
@@ -38,7 +41,7 @@ class OrderOut(BaseModel):
     side: str
     order_type: str
     tif: str
-    qty: int
+    qty: Qty
     limit_price: Money | None
     status: str
     reject_reason: str | None
@@ -57,7 +60,7 @@ class AccountOut(BaseModel):
 
 class PositionOut(BaseModel):
     symbol: str
-    qty: int
+    qty: Qty
     avg_cost: Money
     last_price: Money
     market_value: Money
@@ -103,7 +106,7 @@ class TradeOut(BaseModel):
     order_id: int
     symbol: str
     side: str
-    qty: int
+    qty: Qty
     price: Money
     commission: Money
     realized_pnl: Money | None

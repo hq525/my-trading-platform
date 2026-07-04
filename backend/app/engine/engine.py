@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
+from app.assets import is_crypto_symbol
 from app.marketdata.base import MarketDataError, UnknownSymbolError
 from app.models import Account, Fill, Order, Position
 from app.timeutil import utcnow
@@ -21,7 +22,7 @@ class TradingEngine:
         self.market_data = market_data
 
     def place_order(self, session, *, account_id: int, symbol: str, side: str,
-                    order_type: str, qty: int, tif: str = "day",
+                    order_type: str, qty: Decimal, tif: str = "day",
                     limit_price: Decimal | None = None,
                     idempotency_key: str | None = None) -> Order:
         if idempotency_key is not None:
@@ -35,6 +36,8 @@ class TradingEngine:
         if account is None:
             raise ValueError(f"no such account: {account_id}")
 
+        qty = qty if isinstance(qty, Decimal) else Decimal(str(qty))
+
         order = Order(account_id=account_id, symbol=symbol.upper(), side=side,
                       order_type=order_type, tif=tif, qty=qty,
                       limit_price=limit_price, idempotency_key=idempotency_key,
@@ -47,6 +50,14 @@ class TradingEngine:
             return self.reject_order(session, order, "invalid order parameters")
         if qty <= 0:
             return self.reject_order(session, order, "quantity must be positive")
+        if is_crypto_symbol(order.symbol):
+            if qty != qty.quantize(Decimal("0.00000001")):
+                return self.reject_order(
+                    session, order, "quantity precision exceeds 8 decimal places")
+        else:
+            if qty != qty.to_integral_value():
+                return self.reject_order(
+                    session, order, "quantity must be a whole share count")
         if order_type == "limit" and (limit_price is None or limit_price <= 0):
             return self.reject_order(session, order, "limit price required")
 
@@ -100,10 +111,10 @@ class TradingEngine:
         return account.cash - sum(reserved, Decimal("0"))
 
     def available_qty(self, session, account: Account, symbol: str,
-                      exclude_order_id: int | None = None) -> int:
+                      exclude_order_id: int | None = None) -> Decimal:
         pos = session.scalar(select(Position).where(
             Position.account_id == account.id, Position.symbol == symbol))
-        held = pos.qty if pos is not None else 0
+        held = pos.qty if pos is not None else Decimal("0")
         stmt = select(Order.qty).where(
             Order.account_id == account.id,
             Order.symbol == symbol,
@@ -112,7 +123,7 @@ class TradingEngine:
         if exclude_order_id is not None:
             stmt = stmt.where(Order.id != exclude_order_id)
         pending_sells = session.scalars(stmt).all()
-        return held - sum(pending_sells)
+        return held - sum(pending_sells, Decimal("0"))
 
     def apply_fill(self, session, order: Order, price: Decimal) -> Fill:
         if order.status != "pending":
@@ -145,7 +156,7 @@ class TradingEngine:
             Position.account_id == account_id, Position.symbol == symbol))
         if pos is None:
             pos = Position(account_id=account_id, symbol=symbol,
-                           qty=0, avg_cost=Decimal("0"), realized_pnl=Decimal("0"))
+                           qty=Decimal("0"), avg_cost=Decimal("0"), realized_pnl=Decimal("0"))
             session.add(pos)
             session.flush()
         return pos

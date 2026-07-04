@@ -10,7 +10,6 @@ from zoneinfo import ZoneInfo
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import select
 
-from app.engine.valuation import ny_date
 from app.models import Account, StrategyRun, StrategyState
 from app.strategy.base import Context, Strategy
 from app.timeutil import utcnow
@@ -21,13 +20,12 @@ log = logging.getLogger(__name__)
 
 
 class StrategyRunner:
-    def __init__(self, strategies_dir: Path, session_factory, execution,
-                 market_data, calendar, starting_cash: Decimal):
+    def __init__(self, strategies_dir: Path, session_factory, execution_for_symbol,
+                 market_data_for_symbol, starting_cash: Decimal):
         self.strategies_dir = strategies_dir
         self.session_factory = session_factory
-        self.execution = execution
-        self.market_data = market_data
-        self.calendar = calendar
+        self.execution_for_symbol = execution_for_symbol
+        self.market_data_for_symbol = market_data_for_symbol
         self.starting_cash = starting_cash
         self.strategies: dict[str, type[Strategy]] = {}
 
@@ -69,13 +67,11 @@ class StrategyRunner:
                 StrategyState.name == name))
             if state is None or not state.enabled:
                 return None
-            if (cls.schedule == "daily_after_close"
-                    and not self.calendar.is_trading_day(ny_date(utcnow()))):
-                return None
             account = session.scalar(select(Account).where(
                 Account.name == f"strategy:{name}"))
             run = StrategyRun(strategy_name=name, started_at=utcnow())
-            ctx = Context(session, account, self.execution, self.market_data)
+            ctx = Context(session, account, self.execution_for_symbol,
+                         self.market_data_for_symbol)
             try:
                 cls().run(ctx)
                 run.detail = f"orders placed: {len(ctx.placed)}"

@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from app.assets import is_crypto_symbol
 from app.engine.engine import TradingEngine
 from app.engine.sim_adapter import SimAdapter
 from app.models import Account, Order, StrategyRun, StrategyState
@@ -156,10 +157,10 @@ class MixedTrader(Strategy):
     crypto_execution = SimAdapter(crypto_engine, crypto_md, FakeCalendar(open_=True))
 
     def execution_for_symbol(symbol):
-        return crypto_execution if "-" in symbol else execution
+        return crypto_execution if is_crypto_symbol(symbol) else execution
 
     def market_data_for_symbol(symbol):
-        return crypto_md if "-" in symbol else md
+        return crypto_md if is_crypto_symbol(symbol) else md
 
     r = StrategyRunner(Path(tmp_path), session_factory, execution_for_symbol,
                        market_data_for_symbol, Decimal("100000"))
@@ -173,5 +174,5 @@ class MixedTrader(Strategy):
     assert run.status == "ok"
     assert run.detail == "orders placed: 2"
     with session_factory() as s:
-        symbols = {o.symbol for o in s.query(Order).all()}
-        assert symbols == {"SPY", "BTC-USD"}
+        orders = {o.symbol: o.status for o in s.query(Order).all()}
+        assert orders == {"SPY": "filled", "BTC-USD": "filled"}

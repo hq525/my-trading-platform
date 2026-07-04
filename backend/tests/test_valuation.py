@@ -100,3 +100,14 @@ def test_position_values_mixed_account_routes_by_symbol(engine, session, md):
     assert values["BTC-USD"].last_price == Decimal("65000")
     equity = account_equity(session, acct, market_data_for_symbol)
     assert equity == Decimal("100050")  # 98400 cash + 1000 SPY + 650 BTC-USD
+
+
+def test_position_values_excludes_fully_closed_crypto_position(engine, session, md):
+    md.set_quote("BTC-USD", "65000")
+    acct = make_account(session)
+    open_position(engine, session, acct, symbol="BTC-USD", qty=Decimal("0.01"), price="65000")
+    # sell the entire position back down to zero
+    sell_order = engine.place_order(session, account_id=acct.id, symbol="BTC-USD",
+                                    side="sell", order_type="market", qty=Decimal("0.01"))
+    engine.apply_fill(session, sell_order, Decimal("65000"))
+    assert position_values(session, acct, lambda s: md) == []

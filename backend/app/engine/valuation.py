@@ -31,8 +31,9 @@ class PositionValue:
 
 def position_values(session, account: Account, market_data_for_symbol) -> list[PositionValue]:
     out = []
-    positions = session.scalars(select(Position).where(
-        Position.account_id == account.id, Position.qty > 0)).all()
+    all_positions = session.scalars(select(Position).where(
+        Position.account_id == account.id)).all()
+    positions = [p for p in all_positions if p.qty > 0]
     for pos in positions:
         quote = market_data_for_symbol(pos.symbol).get_quote(pos.symbol)
         out.append(PositionValue(

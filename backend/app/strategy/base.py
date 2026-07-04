@@ -46,8 +46,9 @@ class Context:
         return self._account.cash
 
     def positions(self) -> list[Position]:
-        return list(self._session.scalars(select(Position).where(
-            Position.account_id == self._account.id, Position.qty > 0)))
+        all_positions = self._session.scalars(select(Position).where(
+            Position.account_id == self._account.id))
+        return [p for p in all_positions if p.qty > 0]
 
     def orders(self, status: str | None = None) -> list[Order]:
         stmt = select(Order).where(Order.account_id == self._account.id)

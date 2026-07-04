@@ -56,3 +56,9 @@ def test_quote_endpoint_still_routes_stock_symbol(client):
     r = client.get("/api/market/quote/SPY")
     assert r.status_code == 200
     assert r.json()["price"] == "100"
+
+
+def test_tiny_crypto_qty_serializes_without_scientific_notation(client):
+    r = place_crypto(client, {"qty": "0.00000001"})
+    assert r.status_code == 201
+    assert r.json()["qty"] == "0.00000001"

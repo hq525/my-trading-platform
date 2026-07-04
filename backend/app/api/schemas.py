@@ -6,8 +6,10 @@ from pydantic import BaseModel, ConfigDict, PlainSerializer
 
 # All money crosses the API as strings — no float rounding in transit.
 def _serialize_money(d: Decimal) -> str:
-    # Convert to string and strip trailing zeros after decimal point
-    s = str(d)
+    # format(d, "f") forces fixed-point notation, avoiding the scientific
+    # notation str(Decimal) switches to below 1e-6 — reachable for 8dp
+    # crypto quantities even though it never was for 4dp money.
+    s = format(d, "f")
     if '.' in s:
         s = s.rstrip('0').rstrip('.')
     return s

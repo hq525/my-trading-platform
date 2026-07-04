@@ -32,8 +32,7 @@ def build_scheduler(deps) -> BackgroundScheduler:
     scheduler.add_job(run_process_pending, "interval", minutes=2, args=[deps],
                       id="process_pending")
     scheduler.add_job(run_snapshots,
-                      CronTrigger(day_of_week="mon-fri", hour=16, minute=10,
-                                  timezone=NY_TZ),
+                      CronTrigger(hour=16, minute=10, timezone=NY_TZ),
                       args=[deps], id="snapshots")
     deps.runner.register_jobs(scheduler)
     return scheduler

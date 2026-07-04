@@ -11,12 +11,16 @@ from sqlalchemy import select
 from app.jobs import build_scheduler
 
 from app.api import accounts, auth, journal, market, orders, strategies
+from app.assets import is_crypto_symbol
 from app.config import Settings
 from app.db import init_db, make_engine, make_session_factory
 from app.engine.calendar import MarketCalendar
+from app.engine.crypto_calendar import CryptoCalendar
 from app.engine.engine import TradingEngine
 from app.engine.sim_adapter import SimAdapter
 from app.marketdata.alpaca import AlpacaData
+from app.marketdata.binance import BinanceData
+from app.marketdata.coinbase import CoinbaseData
 from app.marketdata.service import MarketDataService
 from app.marketdata.yfinance_provider import YFinanceData
 from app.models import Account
@@ -34,6 +38,16 @@ class AppDeps:
     engine: TradingEngine
     execution: SimAdapter
     runner: StrategyRunner
+    crypto_market_data: object
+    crypto_calendar: object
+    crypto_engine: TradingEngine
+    crypto_execution: SimAdapter
+
+    def execution_for_symbol(self, symbol: str) -> SimAdapter:
+        return self.crypto_execution if is_crypto_symbol(symbol) else self.execution
+
+    def market_data_for_symbol(self, symbol: str):
+        return self.crypto_market_data if is_crypto_symbol(symbol) else self.market_data
 
 
 def build_deps(settings: Settings | None = None, market_data=None,
@@ -51,11 +65,19 @@ def build_deps(settings: Settings | None = None, market_data=None,
     calendar = calendar or MarketCalendar()
     engine = TradingEngine(market_data)
     execution = SimAdapter(engine, market_data, calendar)
+
+    crypto_calendar = CryptoCalendar()
+    crypto_market_data = MarketDataService([CoinbaseData(), BinanceData()])
+    crypto_engine = TradingEngine(crypto_market_data)
+    crypto_execution = SimAdapter(crypto_engine, crypto_market_data, crypto_calendar)
+
     runner = StrategyRunner(STRATEGIES_DIR, session_factory, execution,
                             market_data, calendar, settings.starting_cash)
     return AppDeps(settings=settings, session_factory=session_factory,
                    market_data=market_data, calendar=calendar, engine=engine,
-                   execution=execution, runner=runner)
+                   execution=execution, runner=runner,
+                   crypto_market_data=crypto_market_data, crypto_calendar=crypto_calendar,
+                   crypto_engine=crypto_engine, crypto_execution=crypto_execution)
 
 
 def create_app(deps: AppDeps | None = None, start_scheduler: bool = True) -> FastAPI:

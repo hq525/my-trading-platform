@@ -39,6 +39,13 @@ def client(session_factory, tmp_path):
     fake_cal = FakeCalendar(open_=True)
     engine = TradingEngine(fake_md)
     execution = SimAdapter(engine, fake_md, fake_cal)
+
+    crypto_fake_md = FakeMarketData()
+    crypto_fake_md.set_quote("BTC-USD", "65000")
+    crypto_fake_cal = FakeCalendar(open_=True)
+    crypto_engine = TradingEngine(crypto_fake_md)
+    crypto_execution = SimAdapter(crypto_engine, crypto_fake_md, crypto_fake_cal)
+
     settings = Settings(password="pw", secret_key="test-secret")
     strategies_dir = tmp_path / "strategies"
     strategies_dir.mkdir()
@@ -46,10 +53,14 @@ def client(session_factory, tmp_path):
                             fake_md, fake_cal, settings.starting_cash)
     deps = AppDeps(settings=settings, session_factory=session_factory,
                    market_data=fake_md, calendar=fake_cal, engine=engine,
-                   execution=execution, runner=runner)
+                   execution=execution, runner=runner,
+                   crypto_market_data=crypto_fake_md, crypto_calendar=crypto_fake_cal,
+                   crypto_engine=crypto_engine, crypto_execution=crypto_execution)
     app = create_app(deps, start_scheduler=False)
     c = TestClient(app)
     c.post("/api/login", json={"password": "pw"})
     c.fake_md = fake_md
     c.fake_cal = fake_cal
+    c.crypto_fake_md = crypto_fake_md
+    c.crypto_fake_cal = crypto_fake_cal
     return c

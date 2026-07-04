@@ -21,6 +21,13 @@ def deps(session_factory, tmp_path):
     cal = FakeCalendar(open_=True)
     engine = TradingEngine(md)
     execution = SimAdapter(engine, md, cal)
+
+    crypto_md = FakeMarketData()
+    crypto_md.set_quote("BTC-USD", "65000")
+    crypto_cal = FakeCalendar(open_=True)
+    crypto_engine = TradingEngine(crypto_md)
+    crypto_execution = SimAdapter(crypto_engine, crypto_md, crypto_cal)
+
     strategies_dir = tmp_path / "strategies"
     strategies_dir.mkdir()
     runner = StrategyRunner(Path(strategies_dir), session_factory, execution,
@@ -30,7 +37,9 @@ def deps(session_factory, tmp_path):
         s.commit()
     return AppDeps(settings=Settings(), session_factory=session_factory,
                    market_data=md, calendar=cal, engine=engine,
-                   execution=execution, runner=runner)
+                   execution=execution, runner=runner,
+                   crypto_market_data=crypto_md, crypto_calendar=crypto_cal,
+                   crypto_engine=crypto_engine, crypto_execution=crypto_execution)
 
 
 def test_run_process_pending_fills_queued_order(deps):

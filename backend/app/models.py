@@ -45,7 +45,7 @@ class Order(Base):
     side: Mapped[str] = mapped_column(String)  # buy | sell
     order_type: Mapped[str] = mapped_column(String)  # market | limit
     tif: Mapped[str] = mapped_column(String, default="day")  # day | gtc
-    qty: Mapped[int]
+    qty: Mapped[Decimal] = mapped_column(SqliteDecimal)
     limit_price: Mapped[Decimal | None] = mapped_column(SqliteDecimal, default=None)
     status: Mapped[str] = mapped_column(String, default="pending")
     # pending | filled | cancelled | rejected | expired
@@ -63,7 +63,7 @@ class Fill(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
     price: Mapped[Decimal] = mapped_column(SqliteDecimal)
-    qty: Mapped[int]
+    qty: Mapped[Decimal] = mapped_column(SqliteDecimal)
     commission: Mapped[Decimal] = mapped_column(SqliteDecimal, default=Decimal("0"))
     realized_pnl: Mapped[Decimal | None] = mapped_column(SqliteDecimal, default=None)  # sells only
     filled_at: Mapped[datetime] = mapped_column(default=utcnow)
@@ -78,7 +78,7 @@ class Position(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"))
     symbol: Mapped[str] = mapped_column(String)
-    qty: Mapped[int] = mapped_column(default=0)
+    qty: Mapped[Decimal] = mapped_column(SqliteDecimal, default=Decimal("0"))
     avg_cost: Mapped[Decimal] = mapped_column(SqliteDecimal, default=Decimal("0"))
     realized_pnl: Mapped[Decimal] = mapped_column(SqliteDecimal, default=Decimal("0"))
 

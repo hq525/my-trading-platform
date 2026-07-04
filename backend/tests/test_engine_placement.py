@@ -130,3 +130,32 @@ def test_pending_sells_reserve_shares(engine, session):
     second = place(engine, session, acct, side="sell", qty=60)
     assert second.status == "rejected"
     assert second.reject_reason == "insufficient shares"
+
+
+def test_crypto_buy_allows_fractional_qty(engine, session, md):
+    md.set_quote("BTC-USD", "65000")
+    acct = make_account(session, cash="100000")
+    order = engine.place_order(session, account_id=acct.id, symbol="BTC-USD",
+                               side="buy", order_type="market",
+                               qty=Decimal("0.005"))
+    assert order.status == "pending"
+    assert order.qty == Decimal("0.005")
+
+
+def test_crypto_buy_rejects_over_precise_qty(engine, session, md):
+    md.set_quote("BTC-USD", "65000")
+    acct = make_account(session, cash="100000")
+    order = engine.place_order(session, account_id=acct.id, symbol="BTC-USD",
+                               side="buy", order_type="market",
+                               qty=Decimal("0.123456789"))
+    assert order.status == "rejected"
+    assert order.reject_reason == "quantity precision exceeds 8 decimal places"
+
+
+def test_stock_buy_rejects_fractional_qty(engine, session):
+    acct = make_account(session)
+    order = engine.place_order(session, account_id=acct.id, symbol="SPY",
+                               side="buy", order_type="market",
+                               qty=Decimal("1.5"))
+    assert order.status == "rejected"
+    assert order.reject_reason == "quantity must be a whole share count"

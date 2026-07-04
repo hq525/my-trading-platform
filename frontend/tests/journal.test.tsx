@@ -60,3 +60,14 @@ it("saves an edited note", async () => {
   await userEvent.click(screen.getByRole("button", { name: /save/i }));
   await waitFor(() => expect(api.saveNote).toHaveBeenCalledWith(4, "breakout entry"));
 });
+
+it("tags each trade with its asset class", async () => {
+  renderWithClient(
+    <AccountProvider>
+      <JournalPage />
+    </AccountProvider>,
+  );
+  await screen.findByText("took profits into strength");
+  const tags = screen.getAllByText("Stock");
+  expect(tags).toHaveLength(2); // both mocked trades are SPY
+});

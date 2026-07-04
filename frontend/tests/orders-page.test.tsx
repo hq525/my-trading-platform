@@ -22,7 +22,7 @@ beforeEach(() => {
 const manual = { id: 1, name: "manual", kind: "manual" as const, cash: "1000", starting_cash: "1000" };
 const pendingOrder: Order = {
   id: 3, account_id: 1, symbol: "SPY", side: "buy", order_type: "limit", tif: "gtc",
-  qty: 10, limit_price: "95", status: "pending", reject_reason: null,
+  qty: "10", limit_price: "95", status: "pending", reject_reason: null,
   placed_at: "2026-07-02T15:00:00",
 };
 

@@ -21,12 +21,12 @@ beforeEach(() => {
   vi.mocked(api.accounts).mockResolvedValue([manual]);
   vi.mocked(api.journal).mockResolvedValue([
     {
-      order_id: 5, symbol: "SPY", side: "sell", qty: 5, price: "120",
+      order_id: 5, symbol: "SPY", side: "sell", qty: "5", price: "120",
       commission: "0", realized_pnl: "100", filled_at: "2026-07-02T15:30:00",
       note: "took profits into strength",
     },
     {
-      order_id: 4, symbol: "SPY", side: "buy", qty: 10, price: "100",
+      order_id: 4, symbol: "SPY", side: "buy", qty: "10", price: "100",
       commission: "0", realized_pnl: null, filled_at: "2026-07-01T15:30:00",
       note: null,
     },

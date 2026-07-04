@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useAccount } from "@/app/account-context";
 import { api, ApiError } from "@/lib/api";
 import { formatUsd, gtMoney, mulMoney } from "@/lib/money";
+import { isCryptoSymbol, isValidQty } from "@/lib/qty";
 import type { Order, PlaceOrderBody } from "@/lib/types";
 
 const radio = (active: boolean) =>
@@ -36,13 +37,14 @@ export function OrderTicket({
     enabled: accountId !== null,
   });
 
-  const qtyNum = /^\d+$/.test(qty) ? parseInt(qty, 10) : 0;
+  const allowFractional = isCryptoSymbol(symbol);
+  const qtyValid = isValidQty(qty, allowFractional);
   const previewPrice = type === "limit" ? limitPrice : quotePrice;
   let cost: string | null = null;
   try {
-    cost = previewPrice && qtyNum > 0 ? mulMoney(previewPrice, qtyNum) : null;
+    cost = previewPrice && qtyValid ? mulMoney(previewPrice, qty) : null;
   } catch {
-    cost = null; // partially-typed limit price
+    cost = null; // partially-typed limit price, or qty precision exceeded
   }
   const cash = detail.data?.cash;
   const insufficient =
@@ -59,7 +61,7 @@ export function OrderTicket({
 
   const canSubmit =
     accountId !== null &&
-    qtyNum > 0 &&
+    qtyValid &&
     !insufficient &&
     !place.isPending &&
     (type === "market" || (limitPrice.trim().length > 0 && cost !== null));
@@ -86,9 +88,11 @@ export function OrderTicket({
         ))}
       </div>
 
-      <label className="block text-xs text-gray-500" htmlFor="qty">Quantity</label>
-      <input id="qty" inputMode="numeric" value={qty}
-        onChange={(e) => setQty(e.target.value.replace(/\D/g, ""))}
+      <label className="block text-xs text-gray-500" htmlFor="qty">
+        Quantity {allowFractional ? "(up to 8 decimal places)" : "(whole shares)"}
+      </label>
+      <input id="qty" inputMode="decimal" value={qty}
+        onChange={(e) => setQty(e.target.value.replace(/[^0-9.]/g, ""))}
         className="w-full rounded border border-gray-700 bg-gray-950 px-3 py-1.5 text-sm text-gray-100 outline-none focus:border-gray-500" />
 
       {type === "limit" && (
@@ -130,7 +134,7 @@ export function OrderTicket({
             symbol,
             side,
             order_type: type,
-            qty: qtyNum,
+            qty: qty,
             tif,
             ...(type === "limit" ? { limit_price: limitPrice } : {}),
             idempotency_key: crypto.randomUUID(),

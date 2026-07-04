@@ -38,7 +38,7 @@ beforeEach(() => {
     ...manual,
     equity: "100100",
     positions: [{
-      symbol: "SPY", qty: 10, avg_cost: "100", last_price: "110",
+      symbol: "SPY", qty: "10", avg_cost: "100", last_price: "110",
       market_value: "1100", unrealized_pnl: "100", realized_pnl: "0",
     }],
   });

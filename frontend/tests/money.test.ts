@@ -15,10 +15,19 @@ it("rejects invalid money strings", () => {
   expect(() => moneyToBig("")).toThrow();
 });
 
-it("multiplies price by integer qty exactly", () => {
-  expect(mulMoney("100", 10)).toBe("1000");
-  expect(mulMoney("123.45", 3)).toBe("370.35");
-  expect(mulMoney("0.1", 3)).toBe("0.3"); // no float 0.30000000000000004
+it("mulMoney multiplies exactly, no float drift", () => {
+  expect(mulMoney("100", "10")).toBe("1000");
+  expect(mulMoney("123.45", "3")).toBe("370.35");
+  expect(mulMoney("0.1", "3")).toBe("0.3"); // no float 0.30000000000000004
+});
+
+it("mulMoney handles fractional crypto quantities", () => {
+  expect(mulMoney("65000", "0.005")).toBe("325");
+  expect(mulMoney("65000", "0.01")).toBe("650");
+});
+
+it("mulMoney rejects quantities with more than 8 decimal places", () => {
+  expect(() => mulMoney("100", "0.123456789")).toThrow();
 });
 
 it("adds and subtracts exactly", () => {

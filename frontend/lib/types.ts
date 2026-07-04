@@ -8,7 +8,7 @@ export interface Account {
 
 export interface PositionValue {
   symbol: string;
-  qty: number;
+  qty: string;
   avg_cost: string;
   last_price: string;
   market_value: string;
@@ -34,7 +34,7 @@ export interface Order {
   side: "buy" | "sell";
   order_type: "market" | "limit";
   tif: "day" | "gtc";
-  qty: number;
+  qty: string;
   limit_price: string | null;
   status: "pending" | "filled" | "cancelled" | "rejected" | "expired";
   reject_reason: string | null;
@@ -45,7 +45,7 @@ export interface PlaceOrderBody {
   symbol: string;
   side: "buy" | "sell";
   order_type: "market" | "limit";
-  qty: number;
+  qty: string;
   tif: "day" | "gtc";
   limit_price?: string;
   idempotency_key?: string;
@@ -70,7 +70,7 @@ export interface Trade {
   order_id: number;
   symbol: string;
   side: "buy" | "sell";
-  qty: number;
+  qty: string;
   price: string;
   commission: string;
   realized_pnl: string | null;

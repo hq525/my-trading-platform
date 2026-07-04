@@ -21,9 +21,24 @@ export function bigToMoney(v: bigint): string {
   return `${neg ? "-" : ""}${whole}${frac ? "." + frac : ""}`;
 }
 
-export function mulMoney(price: string, qty: number): string {
-  if (!Number.isInteger(qty)) throw new Error(`qty must be an integer: ${qty}`);
-  return bigToMoney(moneyToBig(price) * BigInt(qty));
+const QTY_SCALE = 8;
+const QTY_FACTOR = 10n ** BigInt(QTY_SCALE);
+
+function qtyToBig(s: string): bigint {
+  const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(s.trim());
+  if (!m) throw new Error(`invalid quantity: ${JSON.stringify(s)}`);
+  const [, sign, whole, frac = ""] = m;
+  if (frac.length > QTY_SCALE) {
+    throw new Error(`quantity precision exceeds ${QTY_SCALE} decimal places: ${s}`);
+  }
+  const digits = whole + frac.padEnd(QTY_SCALE, "0");
+  const value = BigInt(digits);
+  return sign === "-" ? -value : value;
+}
+
+export function mulMoney(price: string, qty: string): string {
+  const scaled = moneyToBig(price) * qtyToBig(qty);
+  return bigToMoney(scaled / QTY_FACTOR);
 }
 
 export function addMoney(a: string, b: string): string {

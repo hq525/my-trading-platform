@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 import httpx
 from sqlalchemy import select
 
 from app.assets import is_crypto_symbol
 from app.engine.engine import InvalidOrderState, TradingEngine
-from app.models import Account, Order
+from app.models import Account, Order, Position
 from app.timeutil import utcnow
 
 
@@ -76,6 +78,58 @@ class AlpacaLiveAdapter:
         # terminal, 404 unknown): a cancel can race a fill, so the next
         # poll mirrors Alpaca's final state instead of guessing here.
         return order
+
+    def process_pending(self, session, now=None) -> None:
+        pending = session.scalars(
+            select(Order).join(Account).where(
+                Order.status == "pending", Account.mode == "live")).all()
+        for order in pending:
+            if order.broker_order_id is None:
+                continue  # never reached the broker; nothing to mirror
+            try:
+                r = self._client.get(f"/v2/orders/{order.broker_order_id}")
+            except httpx.HTTPError:
+                continue  # wait for the next cycle
+            if r.status_code != 200:
+                continue
+            data = r.json()
+            status = data["status"]
+            if status == "filled":
+                self.engine.apply_fill(session, order,
+                                       Decimal(data["filled_avg_price"]))
+            elif status == "canceled":
+                self.engine.cancel_order(session, order.id)
+            elif status == "expired":
+                self.engine.expire_order(session, order)
+            elif status == "rejected":
+                reason = data.get("reason") or "unspecified"
+                self.engine.reject_order(session, order,
+                                         f"broker rejected: {reason}")
+            # anything else (new, accepted, partially_filled, ...) waits
+
+    def sync_account(self, session) -> None:
+        account = session.scalar(select(Account).where(Account.mode == "live"))
+        if account is None:
+            return
+        try:
+            acct_r = self._client.get("/v2/account")
+            pos_r = self._client.get("/v2/positions")
+        except httpx.HTTPError:
+            return  # keep last-known values; last_synced_at ages visibly
+        if acct_r.status_code != 200 or pos_r.status_code != 200:
+            return
+        account.cash = Decimal(acct_r.json()["cash"])
+        remote = {p["symbol"]: Decimal(p["qty"]) for p in pos_r.json()}
+        local_rows = session.scalars(select(Position).where(
+            Position.account_id == account.id)).all()
+        # qty is TEXT in SQLite: compare in Python, never in SQL.
+        local = {p.symbol: p.qty for p in local_rows if p.qty > 0}
+        diffs = [f"{s}: local {local.get(s, Decimal('0'))}, "
+                 f"alpaca {remote.get(s, Decimal('0'))}"
+                 for s in sorted(set(local) | set(remote))
+                 if local.get(s, Decimal("0")) != remote.get(s, Decimal("0"))]
+        account.sync_detail = "; ".join(diffs) if diffs else None
+        account.last_synced_at = self.now_fn()
 
     @staticmethod
     def _error_message(r: httpx.Response) -> str:

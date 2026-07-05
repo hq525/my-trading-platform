@@ -192,3 +192,155 @@ def test_cancel_without_broker_id_cancels_locally(session, live_account):
         order_type="limit", qty=5, limit_price=Decimal("150"))
     result = adapter.cancel_order(session, order.id)
     assert result.status == "cancelled"
+
+
+def _accepting_post(request):
+    return httpx.Response(200, json={"id": "broker-9", "status": "accepted"})
+
+
+def place_pending(session, account, poll_response_json=None,
+                  poll_error=False):
+    """Adapter whose POST accepts and whose GET returns the given order json."""
+    def handler(request):
+        if request.method == "POST" and request.url.path == "/v2/orders":
+            return _accepting_post(request)
+        if poll_error:
+            raise httpx.ConnectError("down")
+        return httpx.Response(200, json=poll_response_json)
+
+    adapter = make_adapter(handler)
+    order = adapter.place_order(session, account_id=account.id, symbol="AAPL",
+                                side="buy", order_type="market", qty=10)
+    assert order.status == "pending"
+    return adapter, order
+
+
+def test_poll_mirrors_fill_at_alpaca_average_price(session, live_account):
+    adapter, order = place_pending(
+        session, live_account,
+        {"status": "filled", "filled_avg_price": "179.55"})
+    adapter.process_pending(session)
+    session.flush()
+    assert order.status == "filled"
+    assert live_account.cash == Decimal("100000") - Decimal("179.55") * 10
+
+
+def test_poll_mirrors_cancellation(session, live_account):
+    adapter, order = place_pending(session, live_account, {"status": "canceled"})
+    adapter.process_pending(session)
+    assert order.status == "cancelled"
+
+
+def test_poll_mirrors_expiry(session, live_account):
+    adapter, order = place_pending(session, live_account, {"status": "expired"})
+    adapter.process_pending(session)
+    assert order.status == "expired"
+
+
+def test_poll_mirrors_rejection_with_reason(session, live_account):
+    adapter, order = place_pending(session, live_account, {"status": "rejected"})
+    adapter.process_pending(session)
+    assert order.status == "rejected"
+    assert order.reject_reason == "broker rejected: unspecified"
+
+
+def test_poll_leaves_nonterminal_statuses_pending(session, live_account):
+    adapter, order = place_pending(
+        session, live_account,
+        {"status": "partially_filled", "filled_avg_price": "179.00"})
+    adapter.process_pending(session)
+    assert order.status == "pending"
+
+
+def test_poll_network_failure_keeps_order_pending(session, live_account):
+    adapter, order = place_pending(session, live_account, poll_error=True)
+    adapter.process_pending(session)
+    assert order.status == "pending"
+
+
+def test_poll_ignores_paper_orders(session, live_account):
+    paper = make_account(session, name="paper-acct")
+    session.commit()
+    polled = []
+
+    def handler(request):
+        if request.method == "POST":
+            return _accepting_post(request)
+        polled.append(request.url.path)
+        return httpx.Response(200, json={"status": "filled",
+                                         "filled_avg_price": "1"})
+
+    adapter = make_adapter(handler)
+    live_order = adapter.place_order(session, account_id=live_account.id,
+                                     symbol="AAPL", side="buy",
+                                     order_type="market", qty=1)
+    paper_order = adapter.engine.place_order(
+        session, account_id=paper.id, symbol="AAPL", side="buy",
+        order_type="limit", qty=1, limit_price=Decimal("100"))
+    adapter.process_pending(session)
+    assert polled == [f"/v2/orders/{live_order.broker_order_id}"]
+    assert paper_order.status == "pending"
+
+
+def sync_adapter(account_json, positions_json, fail=False):
+    def handler(request):
+        if fail:
+            raise httpx.ConnectError("down")
+        if request.url.path == "/v2/account":
+            return httpx.Response(200, json=account_json)
+        if request.url.path == "/v2/positions":
+            return httpx.Response(200, json=positions_json)
+        if request.method == "POST":
+            return _accepting_post(request)
+        return httpx.Response(200, json={"status": "filled",
+                                         "filled_avg_price": "180"})
+
+    return make_adapter(handler)
+
+
+def test_sync_overwrites_cash_and_stamps_time(session, live_account):
+    adapter = sync_adapter({"cash": "98765.43"}, [])
+    adapter.sync_account(session)
+    assert live_account.cash == Decimal("98765.43")
+    assert live_account.last_synced_at is not None
+    assert live_account.sync_detail is None
+
+
+def test_sync_detects_position_mismatch(session, live_account):
+    adapter = sync_adapter({"cash": "98204.50"},
+                           [{"symbol": "AAPL", "qty": "12"}])
+    # Establish a local position of 10 AAPL via a mirrored fill.
+    order = adapter.place_order(session, account_id=live_account.id,
+                                symbol="AAPL", side="buy",
+                                order_type="market", qty=10)
+    adapter.process_pending(session)
+    assert order.status == "filled"
+    adapter.sync_account(session)
+    assert live_account.sync_detail == "AAPL: local 10, alpaca 12"
+
+
+def test_sync_match_clears_previous_mismatch(session, live_account):
+    adapter = sync_adapter({"cash": "98204.50"},
+                           [{"symbol": "AAPL", "qty": "10"}])
+    order = adapter.place_order(session, account_id=live_account.id,
+                                symbol="AAPL", side="buy",
+                                order_type="market", qty=10)
+    adapter.process_pending(session)
+    assert order.status == "filled"
+    live_account.sync_detail = "stale mismatch"
+    adapter.sync_account(session)
+    assert live_account.sync_detail is None
+
+
+def test_sync_failure_changes_nothing(session, live_account):
+    adapter = sync_adapter({}, [], fail=True)
+    adapter.sync_account(session)
+    assert live_account.cash == Decimal("100000")
+    assert live_account.last_synced_at is None
+
+
+def test_sync_without_live_account_is_a_noop(session):
+    make_account(session, name="paper-only")
+    session.commit()
+    adapter = sync_adapter({"cash": "1"}, [])
+    adapter.sync_account(session)  # must not raise

@@ -57,7 +57,11 @@ class AlpacaLiveAdapter:
         if r.status_code not in (200, 201):
             return self.engine.reject_order(
                 session, order, f"broker rejected: {self._error_message(r)}")
-        order.broker_order_id = r.json()["id"]
+        try:
+            order.broker_order_id = r.json()["id"]
+        except (ValueError, KeyError, TypeError):
+            return self.engine.reject_order(
+                session, order, "broker rejected: malformed response")
         return order
 
     def cancel_order(self, session, order_id: int) -> Order:
@@ -92,11 +96,17 @@ class AlpacaLiveAdapter:
                 continue  # wait for the next cycle
             if r.status_code != 200:
                 continue
-            data = r.json()
-            status = data["status"]
+            try:
+                data = r.json()
+                status = data["status"]
+            except (ValueError, KeyError, TypeError):
+                continue  # malformed body; try again next cycle
             if status == "filled":
-                self.engine.apply_fill(session, order,
-                                       Decimal(data["filled_avg_price"]))
+                try:
+                    filled_avg_price = Decimal(data["filled_avg_price"])
+                except (ValueError, KeyError, TypeError, ArithmeticError):
+                    continue  # malformed body; try again next cycle
+                self.engine.apply_fill(session, order, filled_avg_price)
             elif status == "canceled":
                 self.engine.cancel_order(session, order.id)
             elif status == "expired":

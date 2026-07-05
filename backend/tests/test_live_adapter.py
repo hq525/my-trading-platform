@@ -344,3 +344,43 @@ def test_sync_without_live_account_is_a_noop(session):
     session.commit()
     adapter = sync_adapter({"cash": "1"}, [])
     adapter.sync_account(session)  # must not raise
+
+
+def test_poll_non_json_body_does_not_raise_and_leaves_order_pending(
+        session, live_account):
+    def handler(request):
+        if request.method == "POST" and request.url.path == "/v2/orders":
+            return _accepting_post(request)
+        return httpx.Response(200, text="not json")
+
+    adapter = make_adapter(handler)
+    order = adapter.place_order(session, account_id=live_account.id,
+                                symbol="AAPL", side="buy",
+                                order_type="market", qty=10)
+    assert order.status == "pending"
+    adapter.process_pending(session)  # must not raise
+    assert order.status == "pending"
+
+
+def test_poll_filled_with_null_price_does_not_raise_and_leaves_order_pending(
+        session, live_account):
+    adapter, order = place_pending(
+        session, live_account,
+        {"status": "filled", "filled_avg_price": None})
+    adapter.process_pending(session)  # must not raise
+    assert order.status == "pending"
+
+
+def test_submit_malformed_response_rejects_locally_and_releases_reservation(
+        session, live_account):
+    def handler(request):
+        return httpx.Response(200, json={"ok": True})
+
+    adapter = make_adapter(handler)
+    order = adapter.place_order(session, account_id=live_account.id,
+                                symbol="AAPL", side="buy",
+                                order_type="market", qty=10)
+    assert order.status == "rejected"
+    assert order.reject_reason == "broker rejected: malformed response"
+    assert adapter.engine.available_cash(session, live_account) == \
+        Decimal("100000")

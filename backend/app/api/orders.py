@@ -3,6 +3,7 @@ from sqlalchemy import select
 
 from app.api.deps import get_deps, get_session, require_auth
 from app.api.schemas import NoteIn, OrderIn, OrderOut
+from app.engine.alpaca_live_adapter import BrokerError
 from app.engine.engine import InvalidOrderState
 from app.models import Account, JournalNote, Order
 
@@ -13,9 +14,13 @@ router = APIRouter(dependencies=[Depends(require_auth)])
              status_code=201)
 def place_order(account_id: int, body: OrderIn, session=Depends(get_session),
                 deps=Depends(get_deps)):
-    if session.get(Account, account_id) is None:
+    account = session.get(Account, account_id)
+    if account is None:
         raise HTTPException(404, "no such account")
-    execution = deps.execution_for_symbol(body.symbol)
+    execution = deps.execution_for(account, body.symbol)
+    if execution is None:
+        # Live account exists but trading keys were removed from the env.
+        raise HTTPException(503, "live trading not configured")
     return execution.place_order(
         session, account_id=account_id, symbol=body.symbol, side=body.side,
         order_type=body.order_type, qty=body.qty, tif=body.tif,
@@ -38,13 +43,17 @@ def cancel_order(order_id: int, session=Depends(get_session),
     order = session.get(Order, order_id)
     if order is None:
         raise HTTPException(404, "no such order")
-    execution = deps.execution_for_symbol(order.symbol)
+    execution = deps.execution_for(order.account, order.symbol)
+    if execution is None:
+        raise HTTPException(503, "live trading not configured")
     try:
         return execution.cancel_order(session, order_id)
     except ValueError:
         raise HTTPException(404, "no such order")
     except InvalidOrderState as e:
         raise HTTPException(409, str(e))
+    except BrokerError as e:
+        raise HTTPException(502, str(e))
 
 
 @router.put("/orders/{order_id}/note")

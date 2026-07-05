@@ -32,8 +32,10 @@ def account_detail(account_id: int, session=Depends(get_session),
     except MarketDataError:
         raise HTTPException(503, "market data unavailable")
     return AccountDetailOut(
-        id=account.id, name=account.name, kind=account.kind,
-        cash=account.cash, starting_cash=account.starting_cash, equity=equity,
+        id=account.id, name=account.name, kind=account.kind, mode=account.mode,
+        cash=account.cash, starting_cash=account.starting_cash,
+        last_synced_at=account.last_synced_at, sync_detail=account.sync_detail,
+        equity=equity,
         positions=[PositionOut(**vars(pv)) for pv in values])
 
 

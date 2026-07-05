@@ -19,7 +19,8 @@ def journal(account_id: int, session=Depends(get_session)):
     return [TradeOut(order_id=f.order_id, symbol=f.order.symbol,
                      side=f.order.side, qty=f.qty, price=f.price,
                      commission=f.commission, realized_pnl=f.realized_pnl,
-                     filled_at=f.filled_at, note=notes.get(f.order_id))
+                     filled_at=f.filled_at, note=notes.get(f.order_id),
+                     account_mode=f.order.account.mode)
             for f in fills]
 
 

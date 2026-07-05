@@ -20,16 +20,17 @@ class SimAdapter:
     """
 
     def __init__(self, engine: TradingEngine, market_data, calendar, now_fn=utcnow,
-                 owns_symbol=None):
+                 owns_order=None):
         self.engine = engine
         self.market_data = market_data
         self.calendar = calendar
         self.now_fn = now_fn
-        # Two SimAdapters (stock + crypto) share one `orders` table; each must
-        # only touch orders for symbols in its own domain, or it will steal
-        # and mis-price the other pipeline's pending orders. Defaults to
-        # "owns everything" so single-pipeline callers/tests are unaffected.
-        self.owns_symbol = owns_symbol or (lambda symbol: True)
+        # Three adapters (stock + crypto sims, live) share one `orders`
+        # table; each must only touch orders it owns — partitioned by the
+        # account's mode and the symbol's shape — or it will steal and
+        # mis-price another pipeline's pending orders. Defaults to "owns
+        # everything" so single-pipeline callers/tests are unaffected.
+        self.owns_order = owns_order or (lambda order: True)
 
     def place_order(self, session, **kwargs) -> Order:
         order = self.engine.place_order(session, **kwargs)
@@ -46,7 +47,7 @@ class SimAdapter:
         now = now or self.now_fn()
         pending = session.scalars(
             select(Order).where(Order.status == "pending")).all()
-        pending = [o for o in pending if self.owns_symbol(o.symbol)]
+        pending = [o for o in pending if self.owns_order(o)]
 
         for order in pending:
             if order.tif == "day" and now >= self.calendar.expiry_time(order.placed_at):

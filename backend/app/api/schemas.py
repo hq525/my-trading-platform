@@ -54,8 +54,11 @@ class AccountOut(BaseModel):
     id: int
     name: str
     kind: str
+    mode: str
     cash: Money
     starting_cash: Money
+    last_synced_at: datetime | None
+    sync_detail: str | None
 
 
 class PositionOut(BaseModel):
@@ -112,6 +115,7 @@ class TradeOut(BaseModel):
     realized_pnl: Money | None
     filled_at: datetime
     note: str | None
+    account_mode: str
 
 
 class StatsOut(BaseModel):

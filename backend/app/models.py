@@ -29,10 +29,14 @@ class Account(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String, unique=True)
     kind: Mapped[str] = mapped_column(String, default="manual")  # manual | strategy
+    mode: Mapped[str] = mapped_column(String, default="paper")  # paper | live
     cash: Mapped[Decimal] = mapped_column(SqliteDecimal)
     starting_cash: Mapped[Decimal] = mapped_column(SqliteDecimal)
     commission: Mapped[Decimal] = mapped_column(SqliteDecimal, default=Decimal("0"))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    # Live-account sync (spec: Alpaca is the source of truth for live cash).
+    last_synced_at: Mapped[datetime | None] = mapped_column(default=None)
+    sync_detail: Mapped[str | None] = mapped_column(String, default=None)
 
 
 class Order(Base):
@@ -52,6 +56,7 @@ class Order(Base):
     reject_reason: Mapped[str | None] = mapped_column(String, default=None)
     reserved_cash: Mapped[Decimal] = mapped_column(SqliteDecimal, default=Decimal("0"))
     idempotency_key: Mapped[str | None] = mapped_column(String, default=None)
+    broker_order_id: Mapped[str | None] = mapped_column(String, default=None)
     placed_at: Mapped[datetime] = mapped_column(default=utcnow)
 
     account: Mapped[Account] = relationship()

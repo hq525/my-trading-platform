@@ -22,14 +22,16 @@ def deps(session_factory, tmp_path):
     cal = FakeCalendar(open_=True)
     engine = TradingEngine(md)
     execution = SimAdapter(engine, md, cal,
-                           owns_symbol=lambda s: not is_crypto_symbol(s))
+                           owns_order=lambda o: o.account.mode != "live"
+                           and not is_crypto_symbol(o.symbol))
 
     crypto_md = FakeMarketData()
     crypto_md.set_quote("BTC-USD", "65000")
     crypto_cal = FakeCalendar(open_=True)
     crypto_engine = TradingEngine(crypto_md)
     crypto_execution = SimAdapter(crypto_engine, crypto_md, crypto_cal,
-                                  owns_symbol=is_crypto_symbol)
+                                  owns_order=lambda o: o.account.mode != "live"
+                                  and is_crypto_symbol(o.symbol))
 
     strategies_dir = tmp_path / "strategies"
     strategies_dir.mkdir()
@@ -100,3 +102,22 @@ def test_run_process_pending_fills_queued_crypto_order(deps):
     run_process_pending(deps)
     with deps.session_factory() as s:
         assert s.get(Order, order_id).status == "filled"
+
+
+def test_sim_adapters_never_touch_live_orders(deps):
+    from sqlalchemy import select
+
+    from app.models import Account, Order
+
+    with deps.session_factory() as s:
+        live = make_account(s, name="live", mode="live")
+        # Pending live order created via the engine (as if submitted to the
+        # broker); the sim adapters must not fill or expire it.
+        order = deps.engine.place_order(
+            s, account_id=live.id, symbol="SPY", side="buy",
+            order_type="market", qty=10)
+        s.commit()
+        order_id = order.id
+    run_process_pending(deps)
+    with deps.session_factory() as s:
+        assert s.get(Order, order_id).status == "pending"

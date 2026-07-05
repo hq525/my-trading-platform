@@ -65,13 +65,15 @@ def build_deps(settings: Settings | None = None, market_data=None,
     calendar = calendar or MarketCalendar()
     engine = TradingEngine(market_data)
     execution = SimAdapter(engine, market_data, calendar,
-                           owns_symbol=lambda s: not is_crypto_symbol(s))
+                           owns_order=lambda o: o.account.mode != "live"
+                           and not is_crypto_symbol(o.symbol))
 
     crypto_calendar = CryptoCalendar()
     crypto_market_data = MarketDataService([CoinbaseData(), BinanceData()])
     crypto_engine = TradingEngine(crypto_market_data)
     crypto_execution = SimAdapter(crypto_engine, crypto_market_data, crypto_calendar,
-                                  owns_symbol=is_crypto_symbol)
+                                  owns_order=lambda o: o.account.mode != "live"
+                                  and is_crypto_symbol(o.symbol))
 
     def execution_for_symbol(symbol: str) -> SimAdapter:
         return crypto_execution if is_crypto_symbol(symbol) else execution

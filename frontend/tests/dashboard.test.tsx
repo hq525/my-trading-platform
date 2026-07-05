@@ -30,7 +30,10 @@ import { api } from "@/lib/api";
 import { AccountProvider } from "@/app/account-context";
 import DashboardPage from "@/app/page";
 
-const manual = { id: 1, name: "manual", kind: "manual" as const, cash: "99000", starting_cash: "100000" };
+const manual = {
+  id: 1, name: "manual", kind: "manual" as const, mode: "paper" as const,
+  cash: "99000", starting_cash: "100000", last_synced_at: null, sync_detail: null,
+};
 
 beforeEach(() => {
   vi.mocked(api.accounts).mockResolvedValue([manual]);

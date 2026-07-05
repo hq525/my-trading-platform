@@ -23,7 +23,10 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-const manual = { id: 1, name: "manual", kind: "manual" as const, cash: "1000", starting_cash: "1000" };
+const manual = {
+  id: 1, name: "manual", kind: "manual" as const, mode: "paper" as const,
+  cash: "1000", starting_cash: "1000", last_synced_at: null, sync_detail: null,
+};
 
 function setup(quotePrice?: string, symbol = "SPY") {
   vi.mocked(api.accounts).mockResolvedValue([manual]);

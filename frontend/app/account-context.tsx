@@ -17,9 +17,11 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (accountId === null && accounts?.length) {
+      const paper = accounts.filter((a) => a.mode !== "live");
+      if (!paper.length) return;
       const stored = Number(localStorage.getItem("pt-account") ?? "");
-      const fallback = accounts.find((a) => a.kind === "manual") ?? accounts[0];
-      setAccountId(accounts.some((a) => a.id === stored) ? stored : fallback.id);
+      const fallback = paper.find((a) => a.kind === "manual") ?? paper[0];
+      setAccountId(paper.some((a) => a.id === stored) ? stored : fallback.id);
     }
   }, [accounts, accountId]);
 

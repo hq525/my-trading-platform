@@ -14,7 +14,10 @@ import { AccountProvider } from "@/app/account-context";
 import JournalPage from "@/app/journal/page";
 import { api } from "@/lib/api";
 
-const manual = { id: 1, name: "manual", kind: "manual" as const, cash: "1000", starting_cash: "1000" };
+const manual = {
+  id: 1, name: "manual", kind: "manual" as const, mode: "paper" as const,
+  cash: "1000", starting_cash: "1000", last_synced_at: null, sync_detail: null,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -23,12 +26,12 @@ beforeEach(() => {
     {
       order_id: 5, symbol: "SPY", side: "sell", qty: "5", price: "120",
       commission: "0", realized_pnl: "100", filled_at: "2026-07-02T15:30:00",
-      note: "took profits into strength",
+      note: "took profits into strength", account_mode: "paper" as const,
     },
     {
       order_id: 4, symbol: "SPY", side: "buy", qty: "10", price: "100",
       commission: "0", realized_pnl: null, filled_at: "2026-07-01T15:30:00",
-      note: null,
+      note: null, account_mode: "paper" as const,
     },
   ]);
   vi.mocked(api.stats).mockResolvedValue({

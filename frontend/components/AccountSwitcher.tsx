@@ -7,7 +7,8 @@ import { api } from "@/lib/api";
 export function AccountSwitcher() {
   const { accountId, setAccountId } = useAccount();
   const { data: accounts } = useQuery({ queryKey: ["accounts"], queryFn: api.accounts });
-  if (!accounts?.length || accountId === null) return null;
+  const paper = accounts?.filter((a) => a.mode !== "live") ?? [];
+  if (!paper.length || accountId === null) return null;
   return (
     <select
       aria-label="Account"
@@ -15,7 +16,7 @@ export function AccountSwitcher() {
       onChange={(e) => setAccountId(Number(e.target.value))}
       className="rounded border border-gray-700 bg-gray-950 px-2 py-1 text-sm text-gray-200"
     >
-      {accounts.map((a) => (
+      {paper.map((a) => (
         <option key={a.id} value={a.id}>
           {a.name}
         </option>

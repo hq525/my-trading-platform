@@ -11,4 +11,7 @@ class Settings(BaseSettings):
     secret_key: str = "dev-secret-change-me"
     alpaca_key_id: str = ""
     alpaca_secret: str = ""
+    alpaca_trading_key_id: str = ""
+    alpaca_trading_secret: str = ""
+    alpaca_trading_base: str = "https://paper-api.alpaca.markets"
     starting_cash: Decimal = Decimal("100000")

@@ -16,6 +16,14 @@ def run_process_pending(deps) -> None:
     with deps.session_factory() as session:
         deps.execution.process_pending(session)
         deps.crypto_execution.process_pending(session)
+        if deps.live_execution is not None:
+            deps.live_execution.process_pending(session)
+        session.commit()
+
+
+def run_live_sync(deps) -> None:
+    with deps.session_factory() as session:
+        deps.live_execution.sync_account(session)
         session.commit()
 
 
@@ -34,5 +42,8 @@ def build_scheduler(deps) -> BackgroundScheduler:
     scheduler.add_job(run_snapshots,
                       CronTrigger(hour=16, minute=10, timezone=NY_TZ),
                       args=[deps], id="snapshots")
+    if deps.live_execution is not None:
+        scheduler.add_job(run_live_sync, "interval", minutes=10, args=[deps],
+                          id="live_sync")
     deps.runner.register_jobs(scheduler)
     return scheduler

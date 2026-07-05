@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -14,6 +15,7 @@ from app.api import accounts, auth, journal, market, orders, strategies
 from app.assets import is_crypto_symbol
 from app.config import Settings
 from app.db import init_db, make_engine, make_session_factory
+from app.engine.alpaca_live_adapter import AlpacaLiveAdapter
 from app.engine.calendar import MarketCalendar
 from app.engine.crypto_calendar import CryptoCalendar
 from app.engine.engine import TradingEngine
@@ -42,12 +44,18 @@ class AppDeps:
     crypto_calendar: object
     crypto_engine: TradingEngine
     crypto_execution: SimAdapter
+    live_execution: AlpacaLiveAdapter | None = None
 
     def execution_for_symbol(self, symbol: str) -> SimAdapter:
         return self.crypto_execution if is_crypto_symbol(symbol) else self.execution
 
     def market_data_for_symbol(self, symbol: str):
         return self.crypto_market_data if is_crypto_symbol(symbol) else self.market_data
+
+    def execution_for(self, account, symbol: str):
+        if account.mode == "live":
+            return self.live_execution
+        return self.execution_for_symbol(symbol)
 
 
 def build_deps(settings: Settings | None = None, market_data=None,
@@ -75,6 +83,12 @@ def build_deps(settings: Settings | None = None, market_data=None,
                                   owns_order=lambda o: o.account.mode != "live"
                                   and is_crypto_symbol(o.symbol))
 
+    live_execution = None
+    if settings.alpaca_trading_key_id:
+        live_execution = AlpacaLiveAdapter(
+            engine, settings.alpaca_trading_base,
+            settings.alpaca_trading_key_id, settings.alpaca_trading_secret)
+
     def execution_for_symbol(symbol: str) -> SimAdapter:
         return crypto_execution if is_crypto_symbol(symbol) else execution
 
@@ -87,7 +101,8 @@ def build_deps(settings: Settings | None = None, market_data=None,
                    market_data=market_data, calendar=calendar, engine=engine,
                    execution=execution, runner=runner,
                    crypto_market_data=crypto_market_data, crypto_calendar=crypto_calendar,
-                   crypto_engine=crypto_engine, crypto_execution=crypto_execution)
+                   crypto_engine=crypto_engine, crypto_execution=crypto_execution,
+                   live_execution=live_execution)
 
 
 def create_app(deps: AppDeps | None = None, start_scheduler: bool = True) -> FastAPI:
@@ -99,6 +114,19 @@ def create_app(deps: AppDeps | None = None, start_scheduler: bool = True) -> Fas
                                 cash=deps.settings.starting_cash,
                                 starting_cash=deps.settings.starting_cash))
             session.commit()
+
+    if deps.live_execution is not None:
+        with deps.session_factory() as session:
+            if session.scalar(select(Account).where(Account.mode == "live")) is None:
+                # Cash placeholder 0: the sync below immediately replaces it
+                # with Alpaca's real figure, so the UI never sees it.
+                session.add(Account(name="live", kind="manual", mode="live",
+                                    cash=Decimal("0"),
+                                    starting_cash=Decimal("0")))
+                session.commit()
+            deps.live_execution.sync_account(session)
+            session.commit()
+
     deps.runner.discover()
     deps.runner.sync_accounts()
 

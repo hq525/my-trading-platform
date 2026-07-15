@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -29,7 +30,7 @@ class Account(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String, unique=True)
     kind: Mapped[str] = mapped_column(String, default="manual")  # manual | strategy
-    mode: Mapped[str] = mapped_column(String, default="paper")  # paper | live
+    mode: Mapped[str] = mapped_column(String, default="paper")  # paper | live | replay
     cash: Mapped[Decimal] = mapped_column(SqliteDecimal)
     starting_cash: Mapped[Decimal] = mapped_column(SqliteDecimal)
     commission: Mapped[Decimal] = mapped_column(SqliteDecimal, default=Decimal("0"))
@@ -37,6 +38,8 @@ class Account(Base):
     # Live-account sync (spec: Alpaca is the source of truth for live cash).
     last_synced_at: Mapped[datetime | None] = mapped_column(default=None)
     sync_detail: Mapped[str | None] = mapped_column(String, default=None)
+    replay_session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("replay_sessions.id"), default=None)
 
 
 class Order(Base):
@@ -125,3 +128,44 @@ class StrategyRun(Base):
     finished_at: Mapped[datetime | None] = mapped_column(default=None)
     status: Mapped[str] = mapped_column(String, default="ok")  # ok | error
     detail: Mapped[str] = mapped_column(Text, default="")
+
+
+class ReplaySession(Base):
+    __tablename__ = "replay_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    symbols_json: Mapped[str] = mapped_column(Text)      # JSON list of symbols
+    strategies_json: Mapped[str] = mapped_column(Text, default="[]")  # JSON list
+    start_date: Mapped[date] = mapped_column(Date)
+    cursor_date: Mapped[date] = mapped_column(Date)      # latest visible bar
+    end_date: Mapped[date] = mapped_column(Date)         # max bar date at creation
+    starting_cash: Mapped[Decimal] = mapped_column(SqliteDecimal)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+    @property
+    def symbols(self) -> list[str]:
+        return json.loads(self.symbols_json)
+
+    @property
+    def strategies(self) -> list[str]:
+        return json.loads(self.strategies_json)
+
+    @property
+    def exhausted(self) -> bool:
+        return self.cursor_date >= self.end_date
+
+
+class ReplayBar(Base):
+    __tablename__ = "replay_bars"
+    __table_args__ = (UniqueConstraint("session_id", "symbol", "date"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("replay_sessions.id"))
+    symbol: Mapped[str] = mapped_column(String)
+    date: Mapped[date] = mapped_column(Date)
+    open: Mapped[Decimal] = mapped_column(SqliteDecimal)
+    high: Mapped[Decimal] = mapped_column(SqliteDecimal)
+    low: Mapped[Decimal] = mapped_column(SqliteDecimal)
+    close: Mapped[Decimal] = mapped_column(SqliteDecimal)
+    volume: Mapped[int] = mapped_column(default=0)

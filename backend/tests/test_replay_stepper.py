@@ -230,3 +230,24 @@ def test_cancelled_order_is_never_filled_by_a_step(deps):
         result = step_session(db, deps, row.id)
         assert result.fills == []
         assert db.get(Order, order.id).status == "cancelled"
+
+
+def test_refresh_guard_mechanism_sees_committed_cancel(deps):
+    """The step loop's per-order db.refresh must read through to a cancel
+    committed by another session after the order was loaded — the exact
+    mechanism the fill pass relies on to never fill a cancelled order."""
+    with deps.session_factory() as db:
+        row, acct = build(db, {"SPY": [
+            ("2024-06-03", "100", "100", "100", "100"),
+            ("2024-06-04", "100", "100", "100", "100")]})
+        order = EXEC.place_order(db, account_id=acct.id, symbol="SPY",
+                                 side="buy", order_type="market", qty=1)
+        db.commit()
+        loaded = db.get(Order, order.id)
+        assert loaded.status == "pending"
+        with deps.session_factory() as other:
+            EXEC.cancel_order(other, order.id)
+            other.commit()
+        assert loaded.status == "pending"   # stale in-memory state: the hazard
+        db.refresh(loaded)                  # the guard
+        assert loaded.status == "cancelled"

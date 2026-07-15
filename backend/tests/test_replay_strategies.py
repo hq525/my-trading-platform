@@ -29,9 +29,11 @@ class TradesOutsideUniverse(Strategy):
 def build(db, strategies):
     row = make_replay_session(db, symbols=("SPY",), strategies=strategies,
                               start="2024-06-03", end="2024-06-06")
-    for day, close in (("2024-06-03", "100"), ("2024-06-04", "101"),
-                       ("2024-06-05", "102"), ("2024-06-06", "103")):
-        make_replay_bar(db, row.id, "SPY", day, open_=close, close=close)
+    for day, open_, close in (("2024-06-03", "99", "100"),
+                              ("2024-06-04", "100", "101"),
+                              ("2024-06-05", "102", "103"),
+                              ("2024-06-06", "104", "105")):
+        make_replay_bar(db, row.id, "SPY", day, open_=open_, close=close)
     make_replay_account(db, row.id)
     for name in strategies:
         make_replay_account(db, row.id, role=name)

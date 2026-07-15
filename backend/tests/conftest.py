@@ -40,7 +40,7 @@ def client(session_factory, tmp_path):
     fake_cal = FakeCalendar(open_=True)
     engine = TradingEngine(fake_md)
     execution = SimAdapter(engine, fake_md, fake_cal,
-                           owns_order=lambda o: o.account.mode != "live"
+                           owns_order=lambda o: o.account.mode == "paper"
                            and not is_crypto_symbol(o.symbol))
 
     crypto_fake_md = FakeMarketData()
@@ -48,7 +48,7 @@ def client(session_factory, tmp_path):
     crypto_fake_cal = FakeCalendar(open_=True)
     crypto_engine = TradingEngine(crypto_fake_md)
     crypto_execution = SimAdapter(crypto_engine, crypto_fake_md, crypto_fake_cal,
-                                  owns_order=lambda o: o.account.mode != "live"
+                                  owns_order=lambda o: o.account.mode == "paper"
                                   and is_crypto_symbol(o.symbol))
 
     settings = Settings(password="pw", secret_key="test-secret")

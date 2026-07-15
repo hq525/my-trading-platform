@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
 
@@ -26,6 +26,8 @@ from app.marketdata.coinbase import CoinbaseData
 from app.marketdata.service import MarketDataService
 from app.marketdata.yfinance_provider import YFinanceData
 from app.models import Account
+from app.replay.execution import ReplayExecution
+from app.replay.service import ReplaySources
 from app.strategy.runner import StrategyRunner
 
 STRATEGIES_DIR = Path(__file__).resolve().parent.parent / "strategies"
@@ -45,6 +47,8 @@ class AppDeps:
     crypto_engine: TradingEngine
     crypto_execution: SimAdapter
     live_execution: AlpacaLiveAdapter | None = None
+    replay_execution: ReplayExecution = field(default_factory=ReplayExecution)
+    replay_sources: ReplaySources | None = None
 
     def execution_for_symbol(self, symbol: str) -> SimAdapter:
         return self.crypto_execution if is_crypto_symbol(symbol) else self.execution
@@ -53,6 +57,8 @@ class AppDeps:
         return self.crypto_market_data if is_crypto_symbol(symbol) else self.market_data
 
     def execution_for(self, account, symbol: str):
+        if account.mode == "replay":
+            return self.replay_execution
         if account.mode == "live":
             return self.live_execution
         return self.execution_for_symbol(symbol)
@@ -73,14 +79,14 @@ def build_deps(settings: Settings | None = None, market_data=None,
     calendar = calendar or MarketCalendar()
     engine = TradingEngine(market_data)
     execution = SimAdapter(engine, market_data, calendar,
-                           owns_order=lambda o: o.account.mode != "live"
+                           owns_order=lambda o: o.account.mode == "paper"
                            and not is_crypto_symbol(o.symbol))
 
     crypto_calendar = CryptoCalendar()
     crypto_market_data = MarketDataService([CoinbaseData(), BinanceData()])
     crypto_engine = TradingEngine(crypto_market_data)
     crypto_execution = SimAdapter(crypto_engine, crypto_market_data, crypto_calendar,
-                                  owns_order=lambda o: o.account.mode != "live"
+                                  owns_order=lambda o: o.account.mode == "paper"
                                   and is_crypto_symbol(o.symbol))
 
     live_execution = None
@@ -88,6 +94,10 @@ def build_deps(settings: Settings | None = None, market_data=None,
         live_execution = AlpacaLiveAdapter(
             engine, settings.alpaca_trading_base,
             settings.alpaca_trading_key_id, settings.alpaca_trading_secret)
+
+    replay_sources = ReplaySources(stock=YFinanceData(),
+                                   crypto_primary=BinanceData(),
+                                   crypto_fallback=CoinbaseData())
 
     def execution_for_symbol(symbol: str) -> SimAdapter:
         return crypto_execution if is_crypto_symbol(symbol) else execution
@@ -102,7 +112,7 @@ def build_deps(settings: Settings | None = None, market_data=None,
                    execution=execution, runner=runner,
                    crypto_market_data=crypto_market_data, crypto_calendar=crypto_calendar,
                    crypto_engine=crypto_engine, crypto_execution=crypto_execution,
-                   live_execution=live_execution)
+                   live_execution=live_execution, replay_sources=replay_sources)
 
 
 def create_app(deps: AppDeps | None = None, start_scheduler: bool = True) -> FastAPI:

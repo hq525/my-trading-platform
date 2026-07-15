@@ -38,7 +38,7 @@ def make_live_deps(session_factory, tmp_path, live_handler=None):
     cal = FakeCalendar(open_=True)
     engine = TradingEngine(md)
     execution = SimAdapter(engine, md, cal,
-                           owns_order=lambda o: o.account.mode != "live"
+                           owns_order=lambda o: o.account.mode == "paper"
                            and not is_crypto_symbol(o.symbol))
 
     crypto_md = FakeMarketData()
@@ -46,7 +46,7 @@ def make_live_deps(session_factory, tmp_path, live_handler=None):
     crypto_cal = FakeCalendar(open_=True)
     crypto_engine = TradingEngine(crypto_md)
     crypto_execution = SimAdapter(crypto_engine, crypto_md, crypto_cal,
-                                  owns_order=lambda o: o.account.mode != "live"
+                                  owns_order=lambda o: o.account.mode == "paper"
                                   and is_crypto_symbol(o.symbol))
 
     strategies_dir = tmp_path / "strategies"

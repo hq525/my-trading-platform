@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from app.jobs import build_scheduler
 
-from app.api import accounts, auth, journal, market, orders, strategies
+from app.api import accounts, auth, journal, market, orders, replay, strategies
 from app.assets import is_crypto_symbol
 from app.config import Settings
 from app.db import init_db, make_engine, make_session_factory
@@ -166,4 +166,5 @@ def create_app(deps: AppDeps | None = None, start_scheduler: bool = True) -> Fas
     app.include_router(market.router, prefix="/api")
     app.include_router(journal.router, prefix="/api")
     app.include_router(strategies.router, prefix="/api")
+    app.include_router(replay.router, prefix="/api")
     return app

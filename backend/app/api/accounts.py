@@ -5,7 +5,8 @@ from app.api.deps import get_deps, get_session, require_auth
 from app.api.schemas import AccountDetailOut, AccountOut, PositionOut, SnapshotOut
 from app.engine.valuation import account_equity, position_values
 from app.marketdata.base import MarketDataError
-from app.models import Account, EquitySnapshot
+from app.models import Account, EquitySnapshot, ReplaySession
+from app.replay.market_data import ReplayMarketData
 
 router = APIRouter(dependencies=[Depends(require_auth)])
 
@@ -26,9 +27,15 @@ def list_accounts(session=Depends(get_session)):
 def account_detail(account_id: int, session=Depends(get_session),
                    deps=Depends(get_deps)):
     account = _account_or_404(session, account_id)
+    if account.mode == "replay":
+        session_row = session.get(ReplaySession, account.replay_session_id)
+        replay_md = ReplayMarketData(session, session_row, strict=False)
+        lookup = lambda symbol: replay_md  # noqa: E731
+    else:
+        lookup = deps.market_data_for_symbol
     try:
-        values = position_values(session, account, deps.market_data_for_symbol)
-        equity = account_equity(session, account, deps.market_data_for_symbol)
+        values = position_values(session, account, lookup)
+        equity = account_equity(session, account, lookup)
     except MarketDataError:
         raise HTTPException(503, "market data unavailable")
     return AccountDetailOut(

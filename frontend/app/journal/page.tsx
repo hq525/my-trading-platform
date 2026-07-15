@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAccount } from "@/app/account-context";
 import { StatCard } from "@/components/StatCard";
@@ -9,16 +9,22 @@ import { formatDateTime } from "@/lib/format";
 import { formatQty, isCryptoSymbol } from "@/lib/qty";
 import { formatUsd, isNeg } from "@/lib/money";
 
+const MODES = ["all", "paper", "live"] as const;
+type Mode = (typeof MODES)[number];
+
 export default function JournalPage() {
   const { accountId } = useAccount();
   const qc = useQueryClient();
   const [editing, setEditing] = useState<number | null>(null);
   const [text, setText] = useState("");
+  const [mode, setMode] = useState<Mode>("all");
 
-  const trades = useQuery({
-    queryKey: ["journal", accountId],
-    queryFn: () => api.journal(accountId!),
-    enabled: accountId !== null,
+  const accounts = useQuery({ queryKey: ["accounts"], queryFn: api.accounts });
+  const journals = useQueries({
+    queries: (accounts.data ?? []).map((a) => ({
+      queryKey: ["journal", a.id],
+      queryFn: () => api.journal(a.id),
+    })),
   });
   const stats = useQuery({
     queryKey: ["stats", accountId],
@@ -30,9 +36,18 @@ export default function JournalPage() {
     mutationFn: ({ id, note }: { id: number; note: string }) => api.saveNote(id, note),
     onSuccess: () => {
       setEditing(null);
-      void qc.invalidateQueries({ queryKey: ["journal", accountId] });
+      void qc.invalidateQueries({ queryKey: ["journal"] });
     },
   });
+
+  const loaded =
+    accounts.data !== undefined && journals.every((q) => q.data !== undefined);
+  const trades = journals
+    .flatMap((q) => q.data ?? [])
+    .filter((t) => mode === "all" || t.account_mode === mode)
+    .sort((a, b) =>
+      a.filled_at < b.filled_at ? 1 : a.filled_at > b.filled_at ? -1 : b.order_id - a.order_id,
+    );
 
   const s = stats.data;
 
@@ -50,8 +65,22 @@ export default function JournalPage() {
         </div>
       )}
 
+      <div className="flex gap-1">
+        {MODES.map((m) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className={`rounded px-3 py-1.5 text-sm capitalize ${
+              mode === m ? "bg-gray-800 text-white" : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            {m}
+          </button>
+        ))}
+      </div>
+
       <div className="space-y-2">
-        {(trades.data ?? []).map((t) => (
+        {trades.map((t) => (
           <div key={`${t.order_id}-${t.filled_at}`}
             className="rounded-lg border border-gray-800 bg-gray-900 p-3">
             <div className="flex flex-wrap items-baseline gap-3 text-sm">
@@ -64,6 +93,15 @@ export default function JournalPage() {
               </span>
               <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] uppercase text-gray-400">
                 {isCryptoSymbol(t.symbol) ? "Crypto" : "Stock"}
+              </span>
+              <span
+                className={`rounded px-1.5 py-0.5 text-[10px] uppercase ${
+                  t.account_mode === "live"
+                    ? "bg-amber-900 text-amber-300"
+                    : "bg-gray-800 text-gray-400"
+                }`}
+              >
+                {t.account_mode === "live" ? "Live" : "Paper"}
               </span>
               {t.realized_pnl !== null && (
                 <span className={isNeg(t.realized_pnl) ? "text-red-400" : "text-emerald-400"}>
@@ -112,7 +150,7 @@ export default function JournalPage() {
             )}
           </div>
         ))}
-        {trades.data?.length === 0 && (
+        {loaded && trades.length === 0 && (
           <p className="text-sm text-gray-500">No trades yet.</p>
         )}
       </div>

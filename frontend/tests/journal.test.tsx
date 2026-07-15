@@ -14,7 +14,10 @@ import { AccountProvider } from "@/app/account-context";
 import JournalPage from "@/app/journal/page";
 import { api } from "@/lib/api";
 
-const manual = { id: 1, name: "manual", kind: "manual" as const, cash: "1000", starting_cash: "1000" };
+const manual = {
+  id: 1, name: "manual", kind: "manual" as const, mode: "paper" as const,
+  cash: "1000", starting_cash: "1000", last_synced_at: null, sync_detail: null,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -23,12 +26,12 @@ beforeEach(() => {
     {
       order_id: 5, symbol: "SPY", side: "sell", qty: "5", price: "120",
       commission: "0", realized_pnl: "100", filled_at: "2026-07-02T15:30:00",
-      note: "took profits into strength",
+      note: "took profits into strength", account_mode: "paper" as const,
     },
     {
       order_id: 4, symbol: "SPY", side: "buy", qty: "10", price: "100",
       commission: "0", realized_pnl: null, filled_at: "2026-07-01T15:30:00",
-      note: null,
+      note: null, account_mode: "paper" as const,
     },
   ]);
   vi.mocked(api.stats).mockResolvedValue({
@@ -70,4 +73,43 @@ it("tags each trade with its asset class", async () => {
   await screen.findByText("took profits into strength");
   const tags = screen.getAllByText("Stock");
   expect(tags).toHaveLength(2); // both mocked trades are SPY
+});
+
+const liveAcct = {
+  id: 9, name: "live", kind: "manual" as const, mode: "live" as const,
+  cash: "50000", starting_cash: "0", last_synced_at: null, sync_detail: null,
+};
+const liveTrade = {
+  order_id: 21, symbol: "AAPL", side: "buy" as const, qty: "2", price: "150",
+  commission: "0", realized_pnl: null, filled_at: "2026-07-03T15:30:00",
+  note: null, account_mode: "live" as const,
+};
+
+it("merges live trades into the list and filters by mode", async () => {
+  const paperTrade = {
+    order_id: 4, symbol: "SPY", side: "buy" as const, qty: "10", price: "100",
+    commission: "0", realized_pnl: null, filled_at: "2026-07-01T15:30:00",
+    note: null, account_mode: "paper" as const,
+  };
+  vi.mocked(api.accounts).mockResolvedValue([manual, liveAcct]);
+  vi.mocked(api.journal).mockImplementation(async (id: number) =>
+    id === 9 ? [liveTrade] : [paperTrade],
+  );
+  renderWithClient(
+    <AccountProvider>
+      <JournalPage />
+    </AccountProvider>,
+  );
+  expect(await screen.findByText(/AAPL/)).toBeInTheDocument();
+  expect(screen.getByText(/SPY/)).toBeInTheDocument();
+  expect(screen.getByText("Live")).toBeInTheDocument();
+  expect(screen.getByText("Paper")).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("button", { name: /^live$/i }));
+  expect(screen.getByText(/AAPL/)).toBeInTheDocument();
+  expect(screen.queryByText(/SPY/)).not.toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("button", { name: /^paper$/i }));
+  expect(screen.getByText(/SPY/)).toBeInTheDocument();
+  expect(screen.queryByText(/AAPL/)).not.toBeInTheDocument();
 });

@@ -2,8 +2,11 @@ export interface Account {
   id: number;
   name: string;
   kind: "manual" | "strategy";
+  mode: "paper" | "live";
   cash: string;
   starting_cash: string;
+  last_synced_at: string | null;
+  sync_detail: string | null;
 }
 
 export interface PositionValue {
@@ -76,6 +79,7 @@ export interface Trade {
   realized_pnl: string | null;
   filled_at: string;
   note: string | null;
+  account_mode: "paper" | "live";
 }
 
 export interface Stats {

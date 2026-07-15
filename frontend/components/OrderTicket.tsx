@@ -18,11 +18,16 @@ const radio = (active: boolean) =>
 export function OrderTicket({
   symbol,
   quotePrice,
+  accountId: accountIdProp,
+  live = false,
 }: {
   symbol: string;
   quotePrice?: string;
+  accountId?: number;
+  live?: boolean;
 }) {
-  const { accountId } = useAccount();
+  const ctx = useAccount();
+  const accountId = accountIdProp ?? ctx.accountId;
   const qc = useQueryClient();
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [type, setType] = useState<"market" | "limit">("market");
@@ -30,6 +35,7 @@ export function OrderTicket({
   const [tif, setTif] = useState<"day" | "gtc">("day");
   const [limitPrice, setLimitPrice] = useState("");
   const [result, setResult] = useState<Order | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   const detail = useQuery({
     queryKey: ["account", accountId],
@@ -37,7 +43,8 @@ export function OrderTicket({
     enabled: accountId !== null,
   });
 
-  const allowFractional = isCryptoSymbol(symbol);
+  const allowFractional = !live && isCryptoSymbol(symbol);
+  const cryptoBlocked = live && isCryptoSymbol(symbol);
   const qtyValid = isValidQty(qty, allowFractional);
   const previewPrice = type === "limit" ? limitPrice : quotePrice;
   let cost: string | null = null;
@@ -62,9 +69,24 @@ export function OrderTicket({
   const canSubmit =
     accountId !== null &&
     qtyValid &&
+    !cryptoBlocked &&
     !insufficient &&
     !place.isPending &&
     (type === "market" || (limitPrice.trim().length > 0 && cost !== null));
+
+  const submit = () => {
+    setConfirming(false);
+    setResult(null);
+    place.mutate({
+      symbol,
+      side,
+      order_type: type,
+      qty: qty,
+      tif,
+      ...(type === "limit" ? { limit_price: limitPrice } : {}),
+      idempotency_key: crypto.randomUUID(),
+    });
+  };
 
   return (
     <div className="space-y-3 rounded-lg border border-gray-800 bg-gray-900 p-4">
@@ -127,26 +149,41 @@ export function OrderTicket({
         {insufficient && <p className="mt-1 text-xs text-red-400">Insufficient cash</p>}
       </div>
 
-      <button
-        onClick={() => {
-          setResult(null);
-          place.mutate({
-            symbol,
-            side,
-            order_type: type,
-            qty: qty,
-            tif,
-            ...(type === "limit" ? { limit_price: limitPrice } : {}),
-            idempotency_key: crypto.randomUUID(),
-          });
-        }}
-        disabled={!canSubmit}
-        className={`w-full rounded px-3 py-2 font-medium text-white disabled:opacity-50 ${
-          side === "buy" ? "bg-emerald-700 hover:bg-emerald-600" : "bg-red-800 hover:bg-red-700"
-        }`}
-      >
-        {place.isPending ? "Placing…" : "Place order"}
-      </button>
+      {live && confirming ? (
+        <div className="space-y-2 rounded border border-amber-800 bg-amber-950 p-3">
+          <p className="text-sm text-amber-300">
+            Place LIVE {side}: {qty} {symbol}, {type}
+            {type === "limit" ? ` @ ${limitPrice}` : ""}, {tif.toUpperCase()}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={submit}
+              className="flex-1 rounded bg-amber-600 px-3 py-2 font-medium text-black hover:bg-amber-500"
+            >
+              Confirm
+            </button>
+            <button
+              onClick={() => setConfirming(false)}
+              className="flex-1 rounded border border-gray-700 px-3 py-2 text-gray-300 hover:border-gray-500"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => (live ? setConfirming(true) : submit())}
+          disabled={!canSubmit}
+          className={`w-full rounded px-3 py-2 font-medium text-white disabled:opacity-50 ${
+            side === "buy" ? "bg-emerald-700 hover:bg-emerald-600" : "bg-red-800 hover:bg-red-700"
+          }`}
+        >
+          {place.isPending ? "Placing…" : live ? "Place LIVE order" : "Place order"}
+        </button>
+      )}
+      {cryptoBlocked && (
+        <p className="text-xs text-amber-400">Crypto is not supported in live trading</p>
+      )}
 
       {place.error && (
         <p className="text-sm text-red-400">

@@ -23,7 +23,10 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-const manual = { id: 1, name: "manual", kind: "manual" as const, cash: "1000", starting_cash: "1000" };
+const manual = {
+  id: 1, name: "manual", kind: "manual" as const, mode: "paper" as const,
+  cash: "1000", starting_cash: "1000", last_synced_at: null, sync_detail: null,
+};
 
 function setup(quotePrice?: string, symbol = "SPY") {
   vi.mocked(api.accounts).mockResolvedValue([manual]);
@@ -122,4 +125,49 @@ it("rejects fractional quantity for a stock symbol", async () => {
   await userEvent.clear(screen.getByLabelText(/quantity/i));
   await userEvent.type(screen.getByLabelText(/quantity/i), "1.5");
   expect(screen.getByRole("button", { name: /place order/i })).toBeDisabled();
+});
+
+function setupLive(quotePrice?: string, symbol = "SPY") {
+  vi.mocked(api.accounts).mockResolvedValue([manual]);
+  vi.mocked(api.accountDetail).mockResolvedValue({ ...manual, equity: "1000", positions: [] });
+  return renderWithClient(
+    <AccountProvider>
+      <OrderTicket symbol={symbol} quotePrice={quotePrice} accountId={9} live />
+    </AccountProvider>,
+  );
+}
+
+it("live mode requires an explicit confirmation before submitting", async () => {
+  vi.mocked(api.placeOrder).mockResolvedValue({
+    id: 11, account_id: 9, symbol: "SPY", side: "buy", order_type: "market",
+    tif: "day", qty: "5", limit_price: null, status: "pending", reject_reason: null,
+    placed_at: "2026-07-05T15:00:00",
+  });
+  setupLive("100");
+  await userEvent.clear(screen.getByLabelText(/quantity/i));
+  await userEvent.type(screen.getByLabelText(/quantity/i), "5");
+  await userEvent.click(screen.getByRole("button", { name: /place live order/i }));
+  expect(api.placeOrder).not.toHaveBeenCalled();
+  expect(screen.getByText(/Place LIVE buy: 5 SPY, market, DAY/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: /^confirm$/i }));
+  await waitFor(() => expect(api.placeOrder).toHaveBeenCalled());
+  const [accountId] = vi.mocked(api.placeOrder).mock.calls[0];
+  expect(accountId).toBe(9); // the live account, not the paper context's
+  expect(await screen.findByText(/pending/i)).toBeInTheDocument();
+});
+
+it("live confirmation can be backed out of", async () => {
+  setupLive("100");
+  await userEvent.click(screen.getByRole("button", { name: /place live order/i }));
+  await userEvent.click(screen.getByRole("button", { name: /^back$/i }));
+  expect(screen.queryByText(/Place LIVE buy/)).not.toBeInTheDocument();
+  expect(api.placeOrder).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: /place live order/i })).toBeInTheDocument();
+});
+
+it("live mode blocks crypto symbols and forces whole shares", async () => {
+  setupLive("65000", "BTC-USD");
+  expect(screen.getByLabelText(/quantity/i)).toHaveAccessibleName(/whole shares/i);
+  expect(screen.getByText(/crypto is not supported in live trading/i)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /place live order/i })).toBeDisabled();
 });

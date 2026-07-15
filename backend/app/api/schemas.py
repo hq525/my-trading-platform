@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -142,3 +142,58 @@ class RunOut(BaseModel):
     finished_at: datetime | None
     status: str
     detail: str
+
+
+class ReplaySessionCreateIn(BaseModel):
+    symbols: list[str]
+    start_date: date
+    strategies: list[str] = []
+    starting_cash: Decimal | None = None
+    name: str | None = None
+
+
+class ReplayAccountOut(BaseModel):
+    id: int
+    name: str
+    role: str  # "manual" or the strategy name
+
+
+class CoverageOut(BaseModel):
+    symbol: str
+    first_date: date
+    last_date: date
+
+
+class ReplaySessionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    symbols: list[str]
+    start_date: date
+    cursor_date: date
+    end_date: date
+    exhausted: bool
+    created_at: datetime
+
+
+class ReplaySessionDetailOut(ReplaySessionOut):
+    accounts: list[ReplayAccountOut]
+    coverage: list[CoverageOut]
+
+
+class StepFillOut(BaseModel):
+    order_id: int
+    symbol: str
+    side: str
+    qty: Qty
+    price: Money
+
+
+class StepResultOut(BaseModel):
+    cursor_date: date
+    fills: list[StepFillOut]
+    expired: list[int]
+    cancelled_at_exhaustion: list[int]
+    strategy_errors: dict[str, str]
+    exhausted: bool

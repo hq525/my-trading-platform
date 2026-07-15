@@ -18,8 +18,9 @@ class TradingEngine:
     """Bookkeeping: validation, reservations, cancellation. Fill policy lives
     in the execution adapter (SimAdapter), which calls back into apply_fill."""
 
-    def __init__(self, market_data):
+    def __init__(self, market_data, now_fn=utcnow):
         self.market_data = market_data
+        self.now_fn = now_fn
 
     def place_order(self, session, *, account_id: int, symbol: str, side: str,
                     order_type: str, qty: Decimal, tif: str = "day",
@@ -41,7 +42,7 @@ class TradingEngine:
         order = Order(account_id=account_id, symbol=symbol.upper(), side=side,
                       order_type=order_type, tif=tif, qty=qty,
                       limit_price=limit_price, idempotency_key=idempotency_key,
-                      placed_at=utcnow())
+                      placed_at=self.now_fn())
         session.add(order)
         session.flush()
 
@@ -131,7 +132,7 @@ class TradingEngine:
         account = session.get(Account, order.account_id)
         commission = account.commission
         fill = Fill(order_id=order.id, price=price, qty=order.qty,
-                    commission=commission, filled_at=utcnow())
+                    commission=commission, filled_at=self.now_fn())
         pos = self._get_or_create_position(session, order.account_id, order.symbol)
         if order.side == "buy":
             account.cash -= price * order.qty + commission

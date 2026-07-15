@@ -29,6 +29,7 @@ _NEW_COLUMNS = [
     ("accounts", "mode", "VARCHAR DEFAULT 'paper'"),
     ("accounts", "last_synced_at", "DATETIME"),
     ("accounts", "sync_detail", "VARCHAR"),
+    ("accounts", "replay_session_id", "INTEGER"),
     ("orders", "broker_order_id", "VARCHAR"),
 ]
 

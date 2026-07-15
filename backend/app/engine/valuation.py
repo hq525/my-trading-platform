@@ -53,6 +53,8 @@ def take_snapshots(session, market_data_for_symbol, now: datetime | None = None)
     now = now or utcnow()
     d = ny_date(now)
     for account in session.scalars(select(Account)).all():
+        if account.mode == "replay":
+            continue  # replay snapshots are written by the stepper, virtual-dated
         try:
             equity = account_equity(session, account, market_data_for_symbol)
         except MarketDataError:

@@ -17,7 +17,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (accountId === null && accounts?.length) {
-      const paper = accounts.filter((a) => a.mode !== "live");
+      const paper = accounts.filter((a) => a.mode === "paper");
       if (!paper.length) return;
       const stored = Number(localStorage.getItem("pt-account") ?? "");
       const fallback = paper.find((a) => a.kind === "manual") ?? paper[0];

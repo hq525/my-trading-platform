@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 export function AccountSwitcher() {
   const { accountId, setAccountId } = useAccount();
   const { data: accounts } = useQuery({ queryKey: ["accounts"], queryFn: api.accounts });
-  const paper = accounts?.filter((a) => a.mode !== "live") ?? [];
+  const paper = accounts?.filter((a) => a.mode === "paper") ?? [];
   if (!paper.length || accountId === null) return null;
   return (
     <select

@@ -21,10 +21,12 @@ export default function JournalPage() {
 
   const accounts = useQuery({ queryKey: ["accounts"], queryFn: api.accounts });
   const journals = useQueries({
-    queries: (accounts.data ?? []).map((a) => ({
-      queryKey: ["journal", a.id],
-      queryFn: () => api.journal(a.id),
-    })),
+    queries: (accounts.data ?? [])
+      .filter((a) => a.mode !== "replay")
+      .map((a) => ({
+        queryKey: ["journal", a.id],
+        queryFn: () => api.journal(a.id),
+      })),
   });
   const stats = useQuery({
     queryKey: ["stats", accountId],

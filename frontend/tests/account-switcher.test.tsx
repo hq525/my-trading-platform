@@ -50,3 +50,24 @@ it("never defaults the paper section to the live account", async () => {
   );
   await waitFor(() => expect(screen.getByTestId("selected")).toHaveTextContent("1"));
 });
+
+it("excludes replay accounts from the switcher and stale selections", async () => {
+  const replayAcct = {
+    id: 40, name: "replay:3:manual", kind: "manual" as const,
+    mode: "replay" as const, cash: "100000", starting_cash: "100000",
+    last_synced_at: null, sync_detail: null,
+  };
+  localStorage.setItem("pt-account", "40"); // stale selection of a replay account
+  vi.mocked(api.accounts).mockResolvedValue([manual, live, replayAcct]);
+  renderWithClient(
+    <AccountProvider>
+      <AccountSwitcher />
+      <ShowAccount />
+    </AccountProvider>,
+  );
+  expect(await screen.findByRole("option", { name: "manual" })).toBeInTheDocument();
+  expect(
+    screen.queryByRole("option", { name: "replay:3:manual" }),
+  ).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByTestId("selected")).toHaveTextContent("1"));
+});

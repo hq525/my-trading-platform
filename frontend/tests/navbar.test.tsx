@@ -64,3 +64,14 @@ it("hides the account switcher in the live section only", async () => {
   expect(screen.getByText("LIVE")).toBeInTheDocument();
   expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
 });
+
+it("shows the replay section links and hides the switcher there", async () => {
+  vi.mocked(api.accounts).mockResolvedValue([manual]);
+  pathname = "/replay/3";
+  renderNav();
+  expect(screen.getByRole("link", { name: "Replay" })).toHaveAttribute("href", "/replay");
+  expect(screen.getByRole("link", { name: "Sessions" })).toHaveAttribute("href", "/replay");
+  expect(screen.queryByRole("link", { name: "Strategies" })).not.toBeInTheDocument();
+  expect(screen.queryByText("LIVE")).not.toBeInTheDocument();
+  expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+});

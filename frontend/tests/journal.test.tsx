@@ -113,3 +113,20 @@ it("merges live trades into the list and filters by mode", async () => {
   expect(screen.getByText(/SPY/)).toBeInTheDocument();
   expect(screen.queryByText(/AAPL/)).not.toBeInTheDocument();
 });
+
+it("excludes replay accounts from the journal fan-out", async () => {
+  const replayAcct = {
+    id: 42, name: "replay:3:manual", kind: "manual" as const,
+    mode: "replay" as const, cash: "100000", starting_cash: "100000",
+    last_synced_at: null, sync_detail: null,
+  };
+  vi.mocked(api.accounts).mockResolvedValue([manual, replayAcct]);
+  renderWithClient(
+    <AccountProvider>
+      <JournalPage />
+    </AccountProvider>,
+  );
+  await screen.findByText("took profits into strength");
+  expect(vi.mocked(api.journal)).toHaveBeenCalledWith(1);
+  expect(vi.mocked(api.journal)).not.toHaveBeenCalledWith(42);
+});

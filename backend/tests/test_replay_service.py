@@ -30,11 +30,11 @@ def make_sources(symbol_days: dict[str, list[tuple[str, str]]]):
 def test_create_session_loads_bars_accounts_and_cursor(session):
     sources = make_sources({"SPY": [("2024-06-03", "100"), ("2024-06-04", "101"),
                                     ("2024-06-05", "102")]})
-    row = create_session(session, sources, symbols=["spy"],
+    row = create_session(session, sources, symbols=["spy", "SPY"],
                          start_date=date(2024, 6, 4), strategies=["SmaCross"],
                          known_strategies={"SmaCross"},
                          starting_cash=Decimal("50000"), today=TODAY)
-    assert row.symbols == ["SPY"]  # upper-cased
+    assert row.symbols == ["SPY"]  # upper-cased + deduped
     assert row.cursor_date == date(2024, 6, 4)
     assert row.end_date == date(2024, 6, 5)
     assert row.name == "SPY from 2024-06-04"

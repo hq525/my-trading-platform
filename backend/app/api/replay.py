@@ -56,7 +56,8 @@ def create(body: ReplaySessionCreateIn, session=Depends(get_session),
             session, deps.replay_sources, symbols=body.symbols,
             start_date=body.start_date, strategies=body.strategies,
             known_strategies=set(deps.runner.strategies),
-            starting_cash=body.starting_cash or deps.settings.starting_cash,
+            starting_cash=(body.starting_cash if body.starting_cash is not None
+                           else deps.settings.starting_cash),
             name=body.name)
     except ReplayCreationError as e:
         raise HTTPException(400, str(e))
@@ -78,7 +79,10 @@ def session_detail(session_id: int, session=Depends(get_session)):
 def step(session_id: int, steps: int = Query(1, ge=1, le=250),
          session=Depends(get_session), deps=Depends(get_deps)):
     _session_or_404(session, session_id)
-    result = step_session(session, deps, session_id, steps=steps)
+    try:
+        result = step_session(session, deps, session_id, steps=steps)
+    except ValueError:
+        raise HTTPException(404, "no such replay session")
     return StepResultOut(
         cursor_date=result.cursor_date, fills=result.fills,
         expired=result.expired,
@@ -89,7 +93,10 @@ def step(session_id: int, steps: int = Query(1, ge=1, le=250),
 @router.delete("/sessions/{session_id}")
 def delete(session_id: int, session=Depends(get_session)):
     _session_or_404(session, session_id)
-    delete_session(session, session_id)
+    try:
+        delete_session(session, session_id)
+    except ValueError:
+        raise HTTPException(404, "no such replay session")
     return {"ok": True}
 
 

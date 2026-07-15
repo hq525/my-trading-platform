@@ -232,6 +232,29 @@ def test_cancelled_order_is_never_filled_by_a_step(deps):
         assert db.get(Order, order.id).status == "cancelled"
 
 
+def test_competing_buys_fill_in_placement_order(deps):
+    """Two market buys compete for the same cash on a gap-up bar; iteration
+    order decides the winner, so the fill pass must order by id. cash 2000,
+    opens gap 100->110: first (qty 10) costs 1100 and fills exactly; second
+    (qty 9) costs 990 against 900 spendable and rejects. Reversed iteration
+    would flip the outcome."""
+    with deps.session_factory() as db:
+        row, acct = build(db, {"SPY": [
+            ("2024-06-03", "100", "100", "100", "100"),
+            ("2024-06-04", "110", "110", "105", "110")]}, cash="2000")
+        first = EXEC.place_order(db, account_id=acct.id, symbol="SPY",
+                                 side="buy", order_type="market", qty=10)
+        second = EXEC.place_order(db, account_id=acct.id, symbol="SPY",
+                                  side="buy", order_type="market", qty=9)
+        db.commit()
+        step_session(db, deps, row.id)
+        db.refresh(first)
+        db.refresh(second)
+        assert first.status == "filled"
+        assert second.status == "rejected"
+        assert second.reject_reason.startswith("insufficient cash at fill")
+
+
 def test_step_refresh_guard_skips_concurrently_cancelled_order(deps, monkeypatch):
     """A cancel landing between the step's pending SELECT and the fill is
     caught by the per-order refresh: inject the cancel at the guard point

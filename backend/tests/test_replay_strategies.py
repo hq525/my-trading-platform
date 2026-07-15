@@ -64,6 +64,9 @@ def test_strategy_errors_are_contained_per_strategy(deps):
         assert "boom" in r.strategy_errors["Exploder"]
         assert "BuyOneSpy" not in r.strategy_errors
         assert r.cursor_date == date(2024, 6, 4)  # step itself succeeded
+        acct = db.scalar(select(Account).where(
+            Account.name == f"replay:{row.id}:strategy:BuyOneSpy"))
+        assert db.scalar(select(Order).where(Order.account_id == acct.id)) is not None
 
 
 def test_missing_strategy_class_is_an_error_entry_not_a_500(deps):

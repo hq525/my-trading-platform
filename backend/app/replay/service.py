@@ -72,8 +72,11 @@ def create_session(db, sources: ReplaySources, *, symbols, start_date: date,
     if not symbols:
         raise ReplayCreationError("at least one symbol is required")
     symbols = [s.strip().upper() for s in symbols if s.strip()]
+    symbols = list(dict.fromkeys(symbols))
     if not symbols:
         raise ReplayCreationError("at least one symbol is required")
+    if starting_cash <= 0:
+        raise ReplayCreationError("starting cash must be positive")
     unknown = [n for n in strategies if n not in known_strategies]
     if unknown:
         raise ReplayCreationError(f"unknown strategies: {', '.join(unknown)}")

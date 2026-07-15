@@ -56,7 +56,7 @@ def _advance_one(db, deps, row: ReplaySession, result: StepResult) -> None:
         .group_by(ReplayBar.symbol)).all())
     pending = db.scalars(select(Order).join(Account).where(
         Order.status == "pending",
-        Account.replay_session_id == row.id)).all()
+        Account.replay_session_id == row.id).order_by(Order.id)).all()
     db.flush()
     for order in pending:
         db.refresh(order)  # a concurrent cancel must win (SimAdapter guard)
@@ -151,7 +151,7 @@ def _run_strategies(db, deps, row: ReplaySession, result: StepResult) -> None:
 def _cancel_all_pending(db, row: ReplaySession, result: StepResult) -> None:
     pending = db.scalars(select(Order).join(Account).where(
         Order.status == "pending",
-        Account.replay_session_id == row.id)).all()
+        Account.replay_session_id == row.id).order_by(Order.id)).all()
     for order in pending:
         order.status = "cancelled"
         result.cancelled_at_exhaustion.append(order.id)

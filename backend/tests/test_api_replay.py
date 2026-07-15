@@ -68,6 +68,8 @@ def test_create_validation_errors(client):
     assert create(client, symbols=[]).status_code == 400
     assert create(client, start_date="2020-01-01").status_code == 400
     assert create(client, strategies=["Ghost"]).status_code == 400
+    assert create(client, starting_cash="0").status_code == 400
+    assert create(client, starting_cash="-5").status_code == 400
 
 
 def test_place_step_and_quote_flow(client):

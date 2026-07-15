@@ -58,6 +58,7 @@ def _fetch_history(sources: ReplaySources, symbol: str, today: date) -> list[Bar
     except MarketDataError as e:
         raise ReplayCreationError(f"could not load history for {symbol}: {e}")
     bars = [b for b in bars if b.timestamp.date() < today]  # drop today's partial
+    bars.sort(key=lambda b: b.timestamp)  # providers should be oldest-first; don't rely on it
     if not bars:
         raise ReplayCreationError(f"no history available for {symbol}")
     return bars

@@ -45,8 +45,12 @@ class FakeCalendar:
     def __init__(self, open_: bool = True, trading_day: bool = True):
         self.open = open_
         self.trading_day = trading_day
-        self.next_open_at = datetime(2026, 7, 6, 13, 30)
-        self.expiry_at = datetime(2026, 7, 6, 20, 0)
+        # Derived from the wall clock so queued day orders never expire under
+        # tests that run process_pending against real utcnow() (hardcoded
+        # dates rotted once the calendar passed them).
+        base = utcnow() + timedelta(days=1)
+        self.next_open_at = base.replace(hour=13, minute=30, second=0, microsecond=0)
+        self.expiry_at = base.replace(hour=20, minute=0, second=0, microsecond=0)
 
     def is_open(self, at):
         return self.open

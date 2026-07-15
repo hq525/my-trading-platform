@@ -6,6 +6,7 @@ import { useState } from "react";
 import { CandleChart } from "@/components/CandleChart";
 import { OrderTicket } from "@/components/OrderTicket";
 import { QuoteBadge } from "@/components/QuoteBadge";
+import { ReplayAccounts } from "@/components/ReplayAccounts";
 import { api, ApiError } from "@/lib/api";
 import { formatUsd } from "@/lib/money";
 import { formatQty } from "@/lib/qty";
@@ -153,6 +154,8 @@ export default function ReplayWorkbenchPage() {
           )}
         </aside>
       </div>
+
+      <ReplayAccounts accounts={detail.accounts} />
     </div>
   );
 }

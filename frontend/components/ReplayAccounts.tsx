@@ -6,7 +6,6 @@ import { EquityCurve } from "@/components/EquityCurve";
 import { OrdersView } from "@/components/OrdersView";
 import { PositionsTable } from "@/components/PositionsTable";
 import { api } from "@/lib/api";
-import { formatDateTime } from "@/lib/format";
 import { formatUsd, isNeg, subMoney } from "@/lib/money";
 import { formatQty } from "@/lib/qty";
 import type { ReplayAccount } from "@/lib/types";
@@ -61,7 +60,8 @@ export function ReplayAccounts({ accounts }: { accounts: ReplayAccount[] }) {
                     {d ? formatUsd(d.equity) : "—"}
                   </td>
                   <td className={`py-1.5 tabular-nums ${
-                    pnl && isNeg(pnl) ? "text-red-400" : "text-emerald-400"
+                    !pnl ? "text-gray-500"
+                      : isNeg(pnl) ? "text-red-400" : "text-emerald-400"
                   }`}>
                     {pnl ? `${isNeg(pnl) ? "" : "+"}${formatUsd(pnl)}` : "—"}
                   </td>
@@ -107,7 +107,11 @@ export function ReplayAccounts({ accounts }: { accounts: ReplayAccount[] }) {
             <div className="space-y-1">
               {(trades.data ?? []).map((t) => (
                 <p key={`${t.order_id}-${t.filled_at}`} className="text-sm">
-                  <span className="text-gray-500">{formatDateTime(t.filled_at)} </span>
+                  <span className="text-gray-500">
+                    {/* virtual timestamps are UTC by convention: render the
+                        date only, never local time (off-by-one past UTC+3) */}
+                    {t.filled_at.slice(0, 10)}{" "}
+                  </span>
                   <span className={t.side === "buy" ? "text-emerald-400" : "text-red-400"}>
                     {t.side}
                   </span>

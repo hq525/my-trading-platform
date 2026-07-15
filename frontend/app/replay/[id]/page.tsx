@@ -46,6 +46,7 @@ export default function ReplayWorkbenchPage() {
     onSuccess: (result) => {
       setLastStep(result);
       void qc.invalidateQueries({ queryKey: ["replay-session", sessionId] });
+      void qc.invalidateQueries({ queryKey: ["replay-sessions"] });
       void qc.invalidateQueries({ queryKey: ["replay-bars", sessionId] });
       void qc.invalidateQueries({ queryKey: ["replay-quote", sessionId] });
       void qc.invalidateQueries({ queryKey: ["account"] });
@@ -57,6 +58,16 @@ export default function ReplayWorkbenchPage() {
 
   if (session.error instanceof ApiError && session.error.status === 404) {
     return <p className="text-sm text-gray-500">Replay session not found.</p>;
+  }
+  if (session.error) {
+    return (
+      <p className="text-sm text-red-400">
+        Failed to load session.{" "}
+        <button onClick={() => void session.refetch()} className="underline">
+          Retry
+        </button>
+      </p>
+    );
   }
   if (!detail) return <p className="text-sm text-gray-500">Loading…</p>;
 

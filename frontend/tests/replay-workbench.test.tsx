@@ -143,3 +143,11 @@ it("shows the not-found state for a missing session", async () => {
   renderPage();
   expect(await screen.findByText("Replay session not found.")).toBeInTheDocument();
 });
+
+it("shows a retryable error state for non-404 failures", async () => {
+  vi.mocked(api.replaySession).mockRejectedValueOnce(new Error("network down"));
+  renderPage();
+  expect(await screen.findByText(/Failed to load session\./)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: /retry/i }));
+  expect(await screen.findByText("SPY from 2024-06-03")).toBeInTheDocument();
+});

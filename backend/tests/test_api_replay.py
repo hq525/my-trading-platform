@@ -53,8 +53,13 @@ def test_create_list_and_detail(client):
                                    "last_date": "2024-06-05"}]
     assert [a["role"] for a in detail["accounts"]] == ["manual"]
 
-    sessions = client.get("/api/replay/sessions").json()
+    listing = client.get("/api/replay/sessions")
+    assert listing.status_code == 200
+    sessions = listing.json()
     assert len(sessions) == 1
+    assert sessions[0]["name"] == "my run"
+    assert sessions[0]["symbols"] == ["SPY"]
+    assert sessions[0]["exhausted"] is False
     assert client.get(f"/api/replay/sessions/{detail['id']}").status_code == 200
     assert client.get("/api/replay/sessions/999").status_code == 404
 
@@ -105,7 +110,14 @@ def test_delete_session(client):
     assert client.delete("/api/replay/sessions/999").status_code == 404
 
 
-def test_quote_unknown_symbol_404(client):
+def test_quote_and_bars_unknown_symbol_404(client):
     session_id = create(client).json()["id"]
     assert client.get(
         f"/api/replay/sessions/{session_id}/quote/AAPL").status_code == 404
+    assert client.get(
+        f"/api/replay/sessions/{session_id}/bars/AAPL").status_code == 404
+
+
+def test_create_503_when_sources_not_configured(client):
+    client.deps.replay_sources = None
+    assert create(client).status_code == 503

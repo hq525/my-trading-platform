@@ -26,6 +26,22 @@ class FakeMarketData:
             for i, c in enumerate(closes)
         ]
 
+    def set_option_quote(self, symbol: str, bid=None, ask=None, last=None) -> None:
+        bid_d = Decimal(str(bid)) if bid is not None else None
+        ask_d = Decimal(str(ask)) if ask is not None else None
+        if bid_d is not None and bid_d <= 0:
+            bid_d = None  # zero/negative bid = no bid, matching the provider
+        if ask_d is not None and ask_d <= 0:
+            ask_d = None
+        if bid_d is not None and ask_d is not None:
+            price = ((bid_d + ask_d) / 2).quantize(Decimal("0.0001"))
+        elif last is not None:
+            price = Decimal(str(last))
+        else:
+            price = ask_d or bid_d or Decimal("0")
+        self.quotes[symbol] = Quote(symbol=symbol, price=price, as_of=utcnow(),
+                                    bid=bid_d, ask=ask_d)
+
     def get_quote(self, symbol: str) -> Quote:
         if self.fail:
             raise MarketDataError("provider down")
@@ -63,6 +79,38 @@ class FakeCalendar:
 
     def expiry_time(self, placed_at):
         return self.expiry_at
+
+
+class FakeOptionsData(FakeMarketData):
+    """Fake for the options data service: quotes plus chains/expirations."""
+
+    def __init__(self):
+        super().__init__()
+        self.expirations: dict[str, list] = {}
+        self.chains: dict[tuple, tuple[list, list]] = {}
+
+    def set_expirations(self, underlying: str, dates: list) -> None:
+        self.expirations[underlying] = dates
+
+    def set_chain(self, underlying: str, expiry, calls: list, puts: list) -> None:
+        self.chains[(underlying, expiry)] = (calls, puts)
+
+    def get_expirations(self, underlying: str) -> list:
+        if self.fail:
+            raise MarketDataError("provider down")
+        if underlying not in self.expirations:
+            raise UnknownSymbolError(underlying)
+        return self.expirations[underlying]
+
+    def get_chain(self, underlying: str, expiry) -> tuple[list, list]:
+        if self.fail:
+            raise MarketDataError("provider down")
+        if (underlying, expiry) not in self.chains:
+            raise UnknownSymbolError(underlying)
+        return self.chains[(underlying, expiry)]
+
+    def get_bars(self, symbol: str, timeframe: str = "1D", limit: int = 200):
+        raise MarketDataError("bars not available for option contracts")
 
 
 class Clock:

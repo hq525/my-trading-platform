@@ -19,6 +19,9 @@ class Quote:
     symbol: str
     price: Decimal
     as_of: datetime  # naive UTC
+    # Options only (spread-crossing fills); None for stocks/crypto.
+    bid: Decimal | None = None
+    ask: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -29,6 +32,22 @@ class Bar:
     low: Decimal
     close: Decimal
     volume: int
+
+
+@dataclass(frozen=True)
+class OptionChainRow:
+    symbol: str
+    strike: Decimal
+    right: str  # "call" | "put"
+    bid: Decimal | None
+    ask: Decimal | None
+    last: Decimal | None
+    open_interest: Decimal | None
+    iv: Decimal | None
+    delta: Decimal | None
+    gamma: Decimal | None
+    theta: Decimal | None
+    vega: Decimal | None
 
 
 class MarketDataProvider(Protocol):

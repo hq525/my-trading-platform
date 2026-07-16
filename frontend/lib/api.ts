@@ -1,6 +1,7 @@
 import type {
   Account, AccountDetail, Bar, Order, PlaceOrderBody, Quote, Snapshot,
-  Stats, Strategy, StrategyRun, Trade,
+  Stats, Strategy, StrategyRun, Trade, CreateReplaySessionBody, ReplaySession,
+  ReplaySessionDetail, StepResult,
 } from "./types";
 
 export class ApiError extends Error {
@@ -72,4 +73,21 @@ export const api = {
     request<Strategy>(`/api/strategies/${encodeURIComponent(name)}/toggle`, { method: "POST" }),
   runs: (name: string, limit = 20) =>
     request<StrategyRun[]>(`/api/strategies/${encodeURIComponent(name)}/runs?limit=${limit}`),
+  createReplaySession: (body: CreateReplaySessionBody) =>
+    request<ReplaySessionDetail>("/api/replay/sessions", post(body)),
+  replaySessions: () => request<ReplaySession[]>("/api/replay/sessions"),
+  replaySession: (id: number) =>
+    request<ReplaySessionDetail>(`/api/replay/sessions/${id}`),
+  stepReplay: (id: number, steps = 1) =>
+    request<StepResult>(`/api/replay/sessions/${id}/step?steps=${steps}`, {
+      method: "POST",
+    }),
+  deleteReplaySession: (id: number) =>
+    request<{ ok: boolean }>(`/api/replay/sessions/${id}`, { method: "DELETE" }),
+  replayBars: (id: number, symbol: string, limit = 1000) =>
+    request<Bar[]>(
+      `/api/replay/sessions/${id}/bars/${encodeURIComponent(symbol)}?limit=${limit}`),
+  replayQuote: (id: number, symbol: string) =>
+    request<Quote>(
+      `/api/replay/sessions/${id}/quote/${encodeURIComponent(symbol)}`),
 };

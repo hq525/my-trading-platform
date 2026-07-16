@@ -19,13 +19,16 @@ const liveLinks = [
   { href: "/live/orders", label: "Orders" },
 ];
 
+const replayLinks = [{ href: "/replay", label: "Sessions" }];
+
 const modeTab = (active: boolean) =>
   `px-3 py-1 ${active ? "bg-gray-800 text-white" : "text-gray-400 hover:text-gray-200"}`;
 
 export function NavBar() {
   const pathname = usePathname();
   const live = pathname === "/live" || pathname.startsWith("/live/");
-  const links = live ? liveLinks : paperLinks;
+  const replay = pathname === "/replay" || pathname.startsWith("/replay/");
+  const links = live ? liveLinks : replay ? replayLinks : paperLinks;
   return (
     <header className="border-b border-gray-800 bg-gray-900">
       <nav className="mx-auto flex max-w-7xl items-center gap-1 px-4 py-2">
@@ -36,11 +39,14 @@ export function NavBar() {
           </span>
         )}
         <div className="mr-4 flex overflow-hidden rounded border border-gray-700 text-sm">
-          <Link href="/" className={modeTab(!live)}>
+          <Link href="/" className={modeTab(!live && !replay)}>
             Paper
           </Link>
           <Link href="/live" className={modeTab(live)}>
             Live
+          </Link>
+          <Link href="/replay" className={modeTab(replay)}>
+            Replay
           </Link>
         </div>
         {links.map((l) => (
@@ -57,7 +63,7 @@ export function NavBar() {
           </Link>
         ))}
         <div className="ml-auto flex items-center gap-2">
-          {!live && <AccountSwitcher />}
+          {!live && !replay && <AccountSwitcher />}
           <button
             onClick={() => {
               void api.logout().then(() => {

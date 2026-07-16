@@ -61,3 +61,36 @@ it("POSTs JSON bodies with content-type", async () => {
   expect(init.body).toBe(JSON.stringify({ password: "pw" }));
   expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
 });
+
+it("steps a replay session with the steps param", async () => {
+  const fetchMock = vi.fn(async () => jsonResponse({
+    cursor_date: "2024-06-04", fills: [], expired: [],
+    cancelled_at_exhaustion: [], strategy_errors: {}, exhausted: false,
+  }));
+  vi.stubGlobal("fetch", fetchMock);
+  await api.stepReplay(3, 5);
+  const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+  expect(url).toBe("/api/replay/sessions/3/step?steps=5");
+  expect(init.method).toBe("POST");
+});
+
+it("fetches replay bars with limit=1000 by default", async () => {
+  const fetchMock = vi.fn(async () => jsonResponse([]));
+  vi.stubGlobal("fetch", fetchMock);
+  await api.replayBars(3, "BTC-USD");
+  const [url] = fetchMock.mock.calls[0] as unknown as [string];
+  expect(url).toBe("/api/replay/sessions/3/bars/BTC-USD?limit=1000");
+});
+
+it("creates a replay session with a JSON body", async () => {
+  const fetchMock = vi.fn(async () => jsonResponse({ id: 1 }));
+  vi.stubGlobal("fetch", fetchMock);
+  await api.createReplaySession({
+    symbols: ["SPY"], start_date: "2024-06-03", strategies: ["SmaCross"],
+  });
+  const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+  expect(url).toBe("/api/replay/sessions");
+  expect(JSON.parse(init.body as string)).toEqual({
+    symbols: ["SPY"], start_date: "2024-06-03", strategies: ["SmaCross"],
+  });
+});

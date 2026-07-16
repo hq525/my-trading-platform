@@ -68,9 +68,13 @@ def client(session_factory, tmp_path):
     strategies_dir.mkdir()
 
     def execution_for_symbol(symbol: str):
+        if is_option_symbol(symbol):
+            return options_execution
         return crypto_execution if is_crypto_symbol(symbol) else execution
 
     def market_data_for_symbol(symbol: str):
+        if is_option_symbol(symbol):
+            return options_fake_md
         return crypto_fake_md if is_crypto_symbol(symbol) else fake_md
 
     runner = StrategyRunner(Path(strategies_dir), session_factory, execution_for_symbol,

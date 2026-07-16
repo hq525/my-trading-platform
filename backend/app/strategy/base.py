@@ -73,7 +73,7 @@ class Context:
         return order
 
     def _place(self, side, symbol, qty, limit_price, tif) -> Order:
-        if is_option_symbol(symbol):
+        if is_option_symbol(symbol.upper()):
             # Fenced BEFORE any engine call: no Order row, no reservation.
             raise ValueError("strategies cannot trade options")
         order = self._execution_for_symbol(symbol).place_order(

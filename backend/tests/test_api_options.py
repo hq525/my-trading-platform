@@ -89,6 +89,33 @@ def test_post_option_order_fills_at_ask_times_100(client):
     assert cash_before - cash_after == Decimal("510")  # 5.10 ask * 1 * 100
 
 
+def test_post_option_order_lowercase_symbol_routes_to_options_adapter(client):
+    # A lowercase OCC symbol must still classify as an option (is_option_symbol
+    # is case-sensitive), so the order has to be uppercased before routing.
+    # The stock fake has no quote for the OCC contract and would reject it as
+    # "unknown symbol", so a fill here proves it reached the options adapter.
+    accounts = client.get("/api/accounts").json()
+    account_id = accounts[0]["id"]
+    cash_before = Decimal(client.get(f"/api/accounts/{account_id}").json()["cash"])
+    r = client.post(f"/api/accounts/{account_id}/orders", json={
+        "symbol": OCC.lower(), "side": "buy", "order_type": "market", "qty": "1"})
+    assert r.status_code == 201
+    assert r.json()["status"] == "filled"
+    cash_after = Decimal(client.get(f"/api/accounts/{account_id}").json()["cash"])
+    assert cash_before - cash_after == Decimal("510")  # 5.10 ask * 1 * 100
+
+
+def test_post_order_with_settle_prefixed_idempotency_key_is_rejected(client):
+    accounts = client.get("/api/accounts").json()
+    account_id = accounts[0]["id"]
+    r = client.post(f"/api/accounts/{account_id}/orders", json={
+        "symbol": "SPY", "side": "buy", "order_type": "market", "qty": "1",
+        "idempotency_key": "settle:1:SPY260821C00625000"})
+    assert r.status_code == 422
+    assert r.json()["detail"] == \
+        "idempotency keys with the 'settle:' prefix are reserved"
+
+
 def test_post_option_order_503_when_options_not_wired(client):
     deps = client.app.state.deps
     saved = deps.options_execution
@@ -135,6 +162,22 @@ def test_strategy_context_rejects_options_before_any_engine_call(session):
                   market_data_for_symbol=lambda s: pytest.fail("must not route"))
     with pytest.raises(ValueError, match="strategies cannot trade options"):
         ctx.buy(OCC, Decimal("1"))
+    assert session.scalars(select(Order)).all() == []
+
+
+def test_strategy_context_rejects_lowercase_options_before_any_engine_call(session):
+    from sqlalchemy import select
+
+    from app.models import Order
+    from app.strategy.base import Context
+    from tests.factories import make_account
+
+    account = make_account(session)
+    ctx = Context(session, account,
+                  execution_for_symbol=lambda s: pytest.fail("must not route"),
+                  market_data_for_symbol=lambda s: pytest.fail("must not route"))
+    with pytest.raises(ValueError, match="strategies cannot trade options"):
+        ctx.buy(OCC.lower(), Decimal("1"))
     assert session.scalars(select(Order)).all() == []
 
 

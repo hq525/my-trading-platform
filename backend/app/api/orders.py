@@ -17,7 +17,9 @@ def place_order(account_id: int, body: OrderIn, session=Depends(get_session),
     account = session.get(Account, account_id)
     if account is None:
         raise HTTPException(404, "no such account")
-    execution = deps.execution_for(account, body.symbol)
+    if body.idempotency_key is not None and body.idempotency_key.startswith("settle:"):
+        raise HTTPException(422, "idempotency keys with the 'settle:' prefix are reserved")
+    execution = deps.execution_for(account, body.symbol.upper())
     if execution is None:
         # Live account exists but trading keys were removed from the env.
         raise HTTPException(503, "live trading not configured"

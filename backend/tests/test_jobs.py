@@ -49,9 +49,13 @@ def deps(session_factory, tmp_path):
     strategies_dir.mkdir()
 
     def execution_for_symbol(symbol: str):
+        if is_option_symbol(symbol):
+            return options_execution
         return crypto_execution if is_crypto_symbol(symbol) else execution
 
     def market_data_for_symbol(symbol: str):
+        if is_option_symbol(symbol):
+            return options_md
         return crypto_md if is_crypto_symbol(symbol) else md
 
     runner = StrategyRunner(Path(strategies_dir), session_factory, execution_for_symbol,
@@ -232,6 +236,11 @@ def test_scheduler_registers_option_expiry_before_snapshots(deps):
     assert job is not None
     fields = {f.name: str(f) for f in job.trigger.fields}
     assert fields["hour"] == "16" and fields["minute"] == "5"
+
+    snapshots_job = scheduler.get_job("snapshots")
+    assert snapshots_job is not None
+    snapshots_fields = {f.name: str(f) for f in snapshots_job.trigger.fields}
+    assert snapshots_fields["hour"] == "16" and snapshots_fields["minute"] == "10"
 
 
 def test_run_option_expiry_settles_expired_position(deps, session_factory):

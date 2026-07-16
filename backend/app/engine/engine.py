@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from datetime import time, timezone
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
-from app.assets import is_crypto_symbol
+from app.assets import contract_multiplier, is_crypto_symbol, is_option_symbol, parse_occ
 from app.marketdata.base import MarketDataError, UnknownSymbolError
 from app.models import Account, Fill, Order, Position
 from app.timeutil import utcnow
+
+NY_TZ = ZoneInfo("America/New_York")
 
 
 class InvalidOrderState(Exception):
@@ -62,6 +66,15 @@ class TradingEngine:
         if order_type == "limit" and (limit_price is None or limit_price <= 0):
             return self.reject_order(session, order, "limit price required")
 
+        if is_option_symbol(order.symbol):
+            # User/API placement only; the settlement job constructs orders
+            # directly and never runs this guard.
+            now_ny = self.now_fn().replace(tzinfo=timezone.utc).astimezone(NY_TZ)
+            expiry = parse_occ(order.symbol).expiry
+            if expiry < now_ny.date() or (expiry == now_ny.date()
+                                          and now_ny.time() >= time(16, 0)):
+                return self.reject_order(session, order, "contract expired")
+
         try:
             quote = self.market_data.get_quote(order.symbol)
         except UnknownSymbolError:
@@ -70,8 +83,14 @@ class TradingEngine:
             return self.reject_order(session, order, "market data unavailable")
 
         if side == "buy":
-            est_price = limit_price if order_type == "limit" else quote.price
-            cost = est_price * qty + account.commission
+            if order_type == "limit":
+                est_price = limit_price
+            elif quote.ask is not None:
+                est_price = quote.ask  # options reserve at the ask (fill price)
+            else:
+                est_price = quote.price
+            cost = (est_price * qty * contract_multiplier(order.symbol)
+                    + account.commission)
             available = self.available_cash(session, account)
             if cost > available:
                 return self.reject_order(
@@ -126,27 +145,30 @@ class TradingEngine:
         pending_sells = session.scalars(stmt).all()
         return held - sum(pending_sells, Decimal("0"))
 
-    def apply_fill(self, session, order: Order, price: Decimal) -> Fill:
+    def apply_fill(self, session, order: Order, price: Decimal,
+                   commission: Decimal | None = None) -> Fill:
         if order.status != "pending":
             raise InvalidOrderState(f"cannot fill order in status {order.status}")
         account = session.get(Account, order.account_id)
-        commission = account.commission
+        if commission is None:
+            commission = account.commission
+        mult = contract_multiplier(order.symbol)
         fill = Fill(order_id=order.id, price=price, qty=order.qty,
                     commission=commission, filled_at=self.now_fn())
         pos = self._get_or_create_position(session, order.account_id, order.symbol)
         if order.side == "buy":
-            account.cash -= price * order.qty + commission
+            account.cash -= price * order.qty * mult + commission
             new_qty = pos.qty + order.qty
             pos.avg_cost = ((pos.avg_cost * pos.qty + price * order.qty) / new_qty
                             ).quantize(Decimal("0.0001"))
             pos.qty = new_qty
         else:
-            pnl = ((price - pos.avg_cost) * order.qty - commission
+            pnl = ((price - pos.avg_cost) * order.qty * mult - commission
                    ).quantize(Decimal("0.0001"))
             fill.realized_pnl = pnl
             pos.realized_pnl += pnl
             pos.qty -= order.qty
-            account.cash += price * order.qty - commission
+            account.cash += price * order.qty * mult - commission
         order.status = "filled"
         session.add(fill)
         session.flush()

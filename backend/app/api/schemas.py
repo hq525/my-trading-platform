@@ -92,6 +92,8 @@ class QuoteOut(BaseModel):
     symbol: str
     price: Money
     as_of: datetime
+    bid: Money | None = None
+    ask: Money | None = None
 
 
 class BarOut(BaseModel):
@@ -103,6 +105,35 @@ class BarOut(BaseModel):
     low: Money
     close: Money
     volume: int
+
+
+class OptionChainRowOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    symbol: str
+    strike: Money
+    right: str
+    bid: Money | None
+    ask: Money | None
+    last: Money | None
+    open_interest: Money | None
+    iv: Money | None
+    delta: Money | None
+    gamma: Money | None
+    theta: Money | None
+    vega: Money | None
+
+
+class OptionChainOut(BaseModel):
+    underlying: str
+    expiry: date
+    calls: list[OptionChainRowOut]
+    puts: list[OptionChainRowOut]
+
+
+class OptionExpirationsOut(BaseModel):
+    underlying: str
+    expirations: list[date]
 
 
 class TradeOut(BaseModel):

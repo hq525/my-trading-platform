@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
+from app.assets import is_option_symbol
 from app.models import Order, Position
 
 
@@ -72,6 +73,9 @@ class Context:
         return order
 
     def _place(self, side, symbol, qty, limit_price, tif) -> Order:
+        if is_option_symbol(symbol):
+            # Fenced BEFORE any engine call: no Order row, no reservation.
+            raise ValueError("strategies cannot trade options")
         order = self._execution_for_symbol(symbol).place_order(
             self._session, account_id=self._account.id, symbol=symbol,
             side=side, order_type="limit" if limit_price is not None else "market",

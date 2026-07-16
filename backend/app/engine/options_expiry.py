@@ -32,9 +32,11 @@ def settle_expired_options(session, *, engine, stock_market_data,
     accounts = session.scalars(
         select(Account).where(Account.mode == "paper")).all()
     for account in accounts:
-        # 1) Release still-pending orders on dead contracts FIRST, so an
-        #    open GTC sell can never block settling the position it covers,
-        #    and dead buys release their reserved_cash.
+        # 1) Release still-pending orders on dead contracts first: dead buys
+        #    release their reserved_cash. The ordering relative to settlement
+        #    is defensive — settlement bypasses place_order and apply_fill
+        #    never consults pending orders, so it would only become load-bearing
+        #    if settlement ever gained an availability check.
         pending = session.scalars(select(Order).where(
             Order.account_id == account.id, Order.status == "pending")).all()
         for order in pending:

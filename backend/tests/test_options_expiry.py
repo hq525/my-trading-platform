@@ -72,7 +72,7 @@ def test_otm_settles_at_zero_and_moves_no_cash(session):
     assert fill.realized_pnl == Decimal("-1000.0000")  # (0-5)*2*100, no commission
 
 
-def test_pending_sell_released_before_settlement(session):
+def test_pending_sell_released_and_position_still_settles(session):
     md, engine, account = setup(session)
     pos = add_position(session, account, ITM_CALL)
     gtc = Order(account_id=account.id, symbol=ITM_CALL, side="sell",

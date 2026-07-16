@@ -224,3 +224,33 @@ def test_run_process_pending_fills_queued_option_order(deps, session_factory):
         assert order.status == "filled"
         fill = s.scalar(select(Fill).where(Fill.order_id == order_id))
         assert fill.price == Decimal("5.10")  # fills at the ask
+
+
+def test_scheduler_registers_option_expiry_before_snapshots(deps):
+    scheduler = build_scheduler(deps)
+    job = scheduler.get_job("option_expiry")
+    assert job is not None
+    fields = {f.name: str(f) for f in job.trigger.fields}
+    assert fields["hour"] == "16" and fields["minute"] == "5"
+
+
+def test_run_option_expiry_settles_expired_position(deps, session_factory):
+    from sqlalchemy import select
+
+    from app.jobs import run_option_expiry
+    from app.models import Account, Position
+
+    with session_factory() as s:
+        account = s.scalar(select(Account))
+        s.add(Position(account_id=account.id, symbol="SPY250620C00090000",
+                       qty=Decimal("1"), avg_cost=Decimal("2"),
+                       realized_pnl=Decimal("0")))
+        cash_before = account.cash
+        s.commit()
+
+    run_option_expiry(deps)
+
+    with session_factory() as s:
+        account = s.scalar(select(Account))
+        # SPY fake quote is 100, strike 90 -> intrinsic 10 * 1 * 100
+        assert account.cash == cash_before + Decimal("1000")

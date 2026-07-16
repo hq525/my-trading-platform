@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
+from app.assets import contract_multiplier
 from app.marketdata.base import MarketDataError
 from app.models import Account, EquitySnapshot, Position
 from app.timeutil import utcnow
@@ -36,10 +37,11 @@ def position_values(session, account: Account, market_data_for_symbol) -> list[P
     positions = [p for p in all_positions if p.qty > 0]
     for pos in positions:
         quote = market_data_for_symbol(pos.symbol).get_quote(pos.symbol)
+        mult = contract_multiplier(pos.symbol)
         out.append(PositionValue(
             symbol=pos.symbol, qty=pos.qty, avg_cost=pos.avg_cost,
-            last_price=quote.price, market_value=quote.price * pos.qty,
-            unrealized_pnl=(quote.price - pos.avg_cost) * pos.qty,
+            last_price=quote.price, market_value=quote.price * pos.qty * mult,
+            unrealized_pnl=(quote.price - pos.avg_cost) * pos.qty * mult,
             realized_pnl=pos.realized_pnl))
     return out
 

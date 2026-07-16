@@ -111,3 +111,26 @@ def test_position_values_excludes_fully_closed_crypto_position(engine, session, 
                                     side="sell", order_type="market", qty=Decimal("0.01"))
     engine.apply_fill(session, sell_order, Decimal("65000"))
     assert position_values(session, acct, lambda s: md) == []
+
+
+def test_option_positions_value_at_mid_times_100(session):
+    from decimal import Decimal
+
+    from app.engine.valuation import account_equity, position_values
+    from app.models import Position
+    from tests.factories import make_account
+    from tests.fakes import FakeMarketData
+
+    account = make_account(session, cash="10000")
+    session.add(Position(account_id=account.id, symbol="SPY260821C00625000",
+                         qty=Decimal("2"), avg_cost=Decimal("5"),
+                         realized_pnl=Decimal("0")))
+    session.flush()
+    md = FakeMarketData()
+    md.set_option_quote("SPY260821C00625000", bid="5.90", ask="6.10")  # mid 6
+    values = position_values(session, account, lambda s: md)
+    pv = values[0]
+    assert pv.last_price == Decimal("6.0000")          # per-share mid
+    assert pv.market_value == Decimal("1200.0000")     # 6 * 2 * 100
+    assert pv.unrealized_pnl == Decimal("200.0000")    # (6-5) * 2 * 100
+    assert account_equity(session, account, lambda s: md) == Decimal("11200.0000")

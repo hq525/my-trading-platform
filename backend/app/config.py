@@ -14,4 +14,6 @@ class Settings(BaseSettings):
     alpaca_trading_key_id: str = ""
     alpaca_trading_secret: str = ""
     alpaca_trading_base: str = "https://paper-api.alpaca.markets"
+    alpaca_options_feed: str = "indicative"
+    alpaca_contracts_base: str = "https://paper-api.alpaca.markets"
     starting_cash: Decimal = Decimal("100000")

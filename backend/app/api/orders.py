@@ -20,7 +20,9 @@ def place_order(account_id: int, body: OrderIn, session=Depends(get_session),
     execution = deps.execution_for(account, body.symbol)
     if execution is None:
         # Live account exists but trading keys were removed from the env.
-        raise HTTPException(503, "live trading not configured")
+        raise HTTPException(503, "live trading not configured"
+                            if account.mode == "live"
+                            else "options trading not configured")
     return execution.place_order(
         session, account_id=account_id, symbol=body.symbol, side=body.side,
         order_type=body.order_type, qty=body.qty, tif=body.tif,
@@ -45,7 +47,9 @@ def cancel_order(order_id: int, session=Depends(get_session),
         raise HTTPException(404, "no such order")
     execution = deps.execution_for(order.account, order.symbol)
     if execution is None:
-        raise HTTPException(503, "live trading not configured")
+        raise HTTPException(503, "live trading not configured"
+                            if order.account.mode == "live"
+                            else "options trading not configured")
     try:
         return execution.cancel_order(session, order_id)
     except ValueError:

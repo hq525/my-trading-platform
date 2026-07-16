@@ -16,6 +16,8 @@ def run_process_pending(deps) -> None:
     with deps.session_factory() as session:
         deps.execution.process_pending(session)
         deps.crypto_execution.process_pending(session)
+        if deps.options_execution is not None:
+            deps.options_execution.process_pending(session)
         if deps.live_execution is not None:
             deps.live_execution.process_pending(session)
         session.commit()

@@ -74,6 +74,8 @@ export function TradeView({
           <OrderTicket
             symbol={symbol}
             quotePrice={quote.data?.price}
+            bid={quote.data?.bid ?? undefined}
+            ask={quote.data?.ask ?? undefined}
             accountId={ticketAccountId}
             live={liveTicket}
           />

@@ -144,3 +144,15 @@ it("shows the backend message when an underlying has no options", async () => {
     await screen.findByText(/no options listed for symbol/i),
   ).toBeInTheDocument();
 });
+
+it("surfaces chain fetch errors instead of claiming no contracts", async () => {
+  const { ApiError } = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  vi.mocked(api.optionChain).mockRejectedValue(new ApiError(503, "market data unavailable"));
+  renderPage();
+  await userEvent.type(screen.getByLabelText(/underlying/i), "spy");
+  await userEvent.click(screen.getByRole("button", { name: /load/i }));
+  expect(
+    await screen.findByText(/could not load the chain/i),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("No contracts")).not.toBeInTheDocument();
+});

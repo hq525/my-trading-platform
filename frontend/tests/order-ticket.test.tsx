@@ -217,6 +217,15 @@ it("option mode: unaffordable premium blocks the buy", async () => {
   expect(screen.getByRole("button", { name: /place order/i })).toBeDisabled();
 });
 
+it("option mode: limit orders preview at the limit price x100", async () => {
+  setupOption();
+  await userEvent.click(screen.getByRole("radio", { name: /limit/i }));
+  await userEvent.type(screen.getByLabelText(/limit price/i), "4.00");
+  await userEvent.clear(screen.getByLabelText(/contracts/i));
+  await userEvent.type(screen.getByLabelText(/contracts/i), "2");
+  expect(await screen.findByText("$800.00")).toBeInTheDocument(); // 4.00 x 100 x 2
+});
+
 it("option mode: submits the raw OCC symbol", async () => {
   vi.mocked(api.placeOrder).mockResolvedValue({
     id: 11, account_id: 1, symbol: OCC, side: "buy", order_type: "market",

@@ -22,7 +22,9 @@ const tabClass = (active: boolean) =>
 
 function OptionsView() {
   const params = useSearchParams();
-  const [input, setInput] = useState((params.get("symbol") ?? "").toUpperCase());
+  const [input, setInput] = useState(
+    (params.get("symbol") ?? "").trim().toUpperCase(),
+  );
   const [underlying, setUnderlying] = useState(input);
   const [expiry, setExpiry] = useState("");
   const [tab, setTab] = useState<"calls" | "puts">("calls");
@@ -161,11 +163,13 @@ function OptionsView() {
             </table>
           ) : (
             <div className="flex h-40 items-center justify-center text-sm text-gray-500">
-              {underlying
-                ? chain.isFetching || expirations.isFetching
-                  ? "Loading chain…"
-                  : "No contracts"
-                : "Enter an underlying to load its option chain"}
+              {chain.isError
+                ? "Could not load the chain — retrying automatically"
+                : underlying
+                  ? chain.isFetching || expirations.isFetching
+                    ? "Loading chain…"
+                    : "No contracts"
+                  : "Enter an underlying to load its option chain"}
             </div>
           )}
         </section>

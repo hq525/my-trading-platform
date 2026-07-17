@@ -171,3 +171,62 @@ it("live mode blocks crypto symbols and forces whole shares", async () => {
   expect(screen.getByText(/crypto is not supported in live trading/i)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /place live order/i })).toBeDisabled();
 });
+
+const OCC = "SPY260821C00625000";
+
+function setupOption() {
+  vi.mocked(api.accounts).mockResolvedValue([manual]);
+  vi.mocked(api.accountDetail).mockResolvedValue({ ...manual, equity: "1000", positions: [] });
+  return renderWithClient(
+    <AccountProvider>
+      <OrderTicket symbol={OCC} quotePrice="5.00" bid="4.90" ask="5.10" />
+    </AccountProvider>,
+  );
+}
+
+it("option mode: human label, contracts qty, x100 cost at the ask", async () => {
+  setupOption();
+  expect(screen.getByText(/Order — SPY 08\/21\/26 \$625 C/)).toBeInTheDocument();
+  expect(screen.getByText("Bid $4.90 · Ask $5.10")).toBeInTheDocument();
+  expect(screen.getByLabelText(/contracts \(whole numbers\)/i)).toBeInTheDocument();
+  // qty defaults to 1: est cost = 5.10 x 100 x 1
+  expect(await screen.findByText("$510.00")).toBeInTheDocument();
+});
+
+it("option mode: sell previews proceeds at the bid", async () => {
+  setupOption();
+  await userEvent.click(screen.getByRole("radio", { name: /sell/i }));
+  await userEvent.clear(screen.getByLabelText(/contracts/i));
+  await userEvent.type(screen.getByLabelText(/contracts/i), "2");
+  // 4.90 x 100 x 2
+  expect(await screen.findByText("$980.00")).toBeInTheDocument();
+});
+
+it("option mode: fractional contracts are invalid", async () => {
+  setupOption();
+  await userEvent.clear(screen.getByLabelText(/contracts/i));
+  await userEvent.type(screen.getByLabelText(/contracts/i), "1.5");
+  expect(screen.getByRole("button", { name: /place order/i })).toBeDisabled();
+});
+
+it("option mode: unaffordable premium blocks the buy", async () => {
+  setupOption(); // cash 1000; 2 contracts at ask = 1020
+  await userEvent.clear(screen.getByLabelText(/contracts/i));
+  await userEvent.type(screen.getByLabelText(/contracts/i), "2");
+  expect(await screen.findByText(/insufficient cash/i)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /place order/i })).toBeDisabled();
+});
+
+it("option mode: submits the raw OCC symbol", async () => {
+  vi.mocked(api.placeOrder).mockResolvedValue({
+    id: 11, account_id: 1, symbol: OCC, side: "buy", order_type: "market",
+    tif: "day", qty: "1", limit_price: null, status: "filled", reject_reason: null,
+    placed_at: "2026-07-17T15:00:00",
+  });
+  setupOption();
+  await userEvent.click(screen.getByRole("button", { name: /place order/i }));
+  await waitFor(() => expect(api.placeOrder).toHaveBeenCalled());
+  const [, body] = vi.mocked(api.placeOrder).mock.calls[0];
+  expect(body.symbol).toBe(OCC);
+  expect(body.qty).toBe("1");
+});

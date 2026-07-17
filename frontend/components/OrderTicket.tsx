@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useAccount } from "@/app/account-context";
 import { api, ApiError } from "@/lib/api";
 import { formatUsd, gtMoney, mulMoney } from "@/lib/money";
+import { formatOptionLabel, isOptionSymbol } from "@/lib/options";
 import { isCryptoSymbol, isValidQty } from "@/lib/qty";
 import type { Order, PlaceOrderBody } from "@/lib/types";
 
@@ -18,11 +19,15 @@ const radio = (active: boolean) =>
 export function OrderTicket({
   symbol,
   quotePrice,
+  bid,
+  ask,
   accountId: accountIdProp,
   live = false,
 }: {
   symbol: string;
   quotePrice?: string;
+  bid?: string;
+  ask?: string;
   accountId?: number;
   live?: boolean;
 }) {
@@ -43,13 +48,19 @@ export function OrderTicket({
     enabled: accountId !== null,
   });
 
-  const allowFractional = !live && isCryptoSymbol(symbol);
+  const option = isOptionSymbol(symbol);
+  const allowFractional = !live && !option && isCryptoSymbol(symbol);
   const cryptoBlocked = live && isCryptoSymbol(symbol);
   const qtyValid = isValidQty(qty, allowFractional);
-  const previewPrice = type === "limit" ? limitPrice : quotePrice;
+  const marketPrice = option ? (side === "buy" ? (ask ?? quotePrice) : (bid ?? quotePrice))
+                             : quotePrice;
+  const previewPrice = type === "limit" ? limitPrice : marketPrice;
   let cost: string | null = null;
   try {
-    cost = previewPrice && qtyValid ? mulMoney(previewPrice, qty) : null;
+    cost = previewPrice && qtyValid
+      ? (option ? mulMoney(mulMoney(previewPrice, "100"), qty)
+                : mulMoney(previewPrice, qty))
+      : null;
   } catch {
     cost = null; // partially-typed limit price, or qty precision exceeded
   }
@@ -90,7 +101,14 @@ export function OrderTicket({
 
   return (
     <div className="space-y-3 rounded-lg border border-gray-800 bg-gray-900 p-4">
-      <h2 className="text-sm font-semibold text-gray-300">Order — {symbol}</h2>
+      <h2 className="text-sm font-semibold text-gray-300">
+        Order — {option ? formatOptionLabel(symbol) : symbol}
+      </h2>
+      {option && (
+        <p className="text-xs text-gray-500">
+          Bid {bid ? formatUsd(bid) : "—"} · Ask {ask ? formatUsd(ask) : "—"}
+        </p>
+      )}
 
       <div className="flex gap-2" role="radiogroup" aria-label="Side">
         {(["buy", "sell"] as const).map((s) => (
@@ -111,7 +129,9 @@ export function OrderTicket({
       </div>
 
       <label className="block text-xs text-gray-500" htmlFor="qty">
-        Quantity {allowFractional ? "(up to 8 decimal places)" : "(whole shares)"}
+        {option
+          ? "Contracts (whole numbers)"
+          : `Quantity ${allowFractional ? "(up to 8 decimal places)" : "(whole shares)"}`}
       </label>
       <input id="qty" inputMode="decimal" value={qty}
         onChange={(e) => setQty(e.target.value.replace(/[^0-9.]/g, ""))}

@@ -7,7 +7,7 @@ const now = new Date("2026-07-02T15:02:00Z");
 it("shows price and age for a fresh quote", () => {
   render(
     <QuoteBadge
-      quote={{ symbol: "SPY", price: "512.34", as_of: "2026-07-02T15:01:30" }}
+      quote={{ symbol: "SPY", price: "512.34", as_of: "2026-07-02T15:01:30", bid: null, ask: null }}
       now={now}
     />,
   );
@@ -18,7 +18,7 @@ it("shows price and age for a fresh quote", () => {
 it("marks a stale quote", () => {
   render(
     <QuoteBadge
-      quote={{ symbol: "SPY", price: "512.34", as_of: "2026-07-02T14:55:00" }}
+      quote={{ symbol: "SPY", price: "512.34", as_of: "2026-07-02T14:55:00", bid: null, ask: null }}
       now={now}
     />,
   );

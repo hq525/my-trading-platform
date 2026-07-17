@@ -94,3 +94,16 @@ it("creates a replay session with a JSON body", async () => {
     symbols: ["SPY"], start_date: "2024-06-03", strategies: ["SmaCross"],
   });
 });
+
+it("builds option endpoint URLs", async () => {
+  const fetchMock = vi.fn(async () =>
+    jsonResponse({ underlying: "SPY", expirations: [] }));
+  vi.stubGlobal("fetch", fetchMock);
+  await api.optionExpirations("SPY");
+  // Cast per this file's convention: a zero-arg vi.fn types mock.calls as [].
+  const [expUrl] = fetchMock.mock.calls[0] as unknown as [string];
+  expect(expUrl).toBe("/api/market/options/SPY/expirations");
+  await api.optionChain("SPY", "2026-08-21");
+  const [chainUrl] = fetchMock.mock.calls[1] as unknown as [string];
+  expect(chainUrl).toBe("/api/market/options/SPY/chain?expiry=2026-08-21");
+});

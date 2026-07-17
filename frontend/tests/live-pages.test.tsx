@@ -65,7 +65,7 @@ it("live orders page lists the live account's orders", async () => {
 
 it("live trade page renders the ticket in live mode against the live account", async () => {
   vi.mocked(api.quote).mockResolvedValue({
-    symbol: "SPY", price: "100", as_of: "2026-07-05T15:00:00",
+    symbol: "SPY", price: "100", as_of: "2026-07-05T15:00:00", bid: null, ask: null,
   });
   vi.mocked(api.bars).mockResolvedValue([]);
   vi.mocked(api.accountDetail).mockResolvedValue({

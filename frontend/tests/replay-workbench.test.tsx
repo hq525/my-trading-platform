@@ -65,7 +65,7 @@ beforeEach(() => {
       low: "99", close: "100", volume: 1000 },
   ]);
   vi.mocked(api.replayQuote).mockResolvedValue({
-    symbol: "SPY", price: "100", as_of: "2024-06-10T21:00:00",
+    symbol: "SPY", price: "100", as_of: "2024-06-10T21:00:00", bid: null, ask: null,
   });
   vi.mocked(api.accountDetail).mockResolvedValue(manualDetail);
   vi.mocked(api.orders).mockResolvedValue([]);

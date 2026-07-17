@@ -7,6 +7,7 @@ import { StatCard } from "@/components/StatCard";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { formatQty, isCryptoSymbol } from "@/lib/qty";
+import { isOptionSymbol } from "@/lib/options";
 import { formatUsd, isNeg } from "@/lib/money";
 
 const MODES = ["all", "paper", "live"] as const;
@@ -94,7 +95,11 @@ export default function JournalPage() {
                 {formatQty(t.qty)} {t.symbol} @ {formatUsd(t.price)}
               </span>
               <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] uppercase text-gray-400">
-                {isCryptoSymbol(t.symbol) ? "Crypto" : "Stock"}
+                {isOptionSymbol(t.symbol)
+                  ? "Option"
+                  : isCryptoSymbol(t.symbol)
+                    ? "Crypto"
+                    : "Stock"}
               </span>
               <span
                 className={`rounded px-1.5 py-0.5 text-[10px] uppercase ${

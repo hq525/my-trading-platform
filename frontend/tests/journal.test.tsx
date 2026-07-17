@@ -146,4 +146,6 @@ it("tags option trades with an Option badge", async () => {
   );
   expect(await screen.findByText("Option")).toBeInTheDocument();
   expect(screen.queryByText("Stock")).not.toBeInTheDocument();
+  expect(screen.getByText(/SPY 08\/21\/26 \$625 C/)).toBeInTheDocument();
+  expect(screen.queryByText(/SPY260821C00625000/)).not.toBeInTheDocument();
 });

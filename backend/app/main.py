@@ -12,15 +12,17 @@ from sqlalchemy import select
 from app.jobs import build_scheduler
 
 from app.api import accounts, auth, journal, market, orders, replay, strategies
-from app.assets import is_crypto_symbol
+from app.assets import is_crypto_symbol, is_option_symbol
 from app.config import Settings
 from app.db import init_db, make_engine, make_session_factory
 from app.engine.alpaca_live_adapter import AlpacaLiveAdapter
 from app.engine.calendar import MarketCalendar
 from app.engine.crypto_calendar import CryptoCalendar
 from app.engine.engine import TradingEngine
+from app.engine.options_sim_adapter import OptionsSimAdapter
 from app.engine.sim_adapter import SimAdapter
 from app.marketdata.alpaca import AlpacaData
+from app.marketdata.alpaca_options import AlpacaOptionsData, OptionsDataService
 from app.marketdata.binance import BinanceData
 from app.marketdata.coinbase import CoinbaseData
 from app.marketdata.service import MarketDataService
@@ -46,14 +48,21 @@ class AppDeps:
     crypto_calendar: object
     crypto_engine: TradingEngine
     crypto_execution: SimAdapter
+    options_market_data: object | None = None
+    options_engine: TradingEngine | None = None
+    options_execution: OptionsSimAdapter | None = None
     live_execution: AlpacaLiveAdapter | None = None
     replay_execution: ReplayExecution = field(default_factory=ReplayExecution)
     replay_sources: ReplaySources | None = None
 
-    def execution_for_symbol(self, symbol: str) -> SimAdapter:
+    def execution_for_symbol(self, symbol: str):
+        if is_option_symbol(symbol):
+            return self.options_execution
         return self.crypto_execution if is_crypto_symbol(symbol) else self.execution
 
     def market_data_for_symbol(self, symbol: str):
+        if is_option_symbol(symbol):
+            return self.options_market_data
         return self.crypto_market_data if is_crypto_symbol(symbol) else self.market_data
 
     def execution_for(self, account, symbol: str):
@@ -80,7 +89,8 @@ def build_deps(settings: Settings | None = None, market_data=None,
     engine = TradingEngine(market_data)
     execution = SimAdapter(engine, market_data, calendar,
                            owns_order=lambda o: o.account.mode == "paper"
-                           and not is_crypto_symbol(o.symbol))
+                           and not is_crypto_symbol(o.symbol)
+                           and not is_option_symbol(o.symbol))
 
     crypto_calendar = CryptoCalendar()
     crypto_market_data = MarketDataService([CoinbaseData(), BinanceData()])
@@ -88,6 +98,16 @@ def build_deps(settings: Settings | None = None, market_data=None,
     crypto_execution = SimAdapter(crypto_engine, crypto_market_data, crypto_calendar,
                                   owns_order=lambda o: o.account.mode == "paper"
                                   and is_crypto_symbol(o.symbol))
+
+    options_market_data = OptionsDataService(AlpacaOptionsData(
+        settings.alpaca_key_id, settings.alpaca_secret,
+        feed=settings.alpaca_options_feed,
+        contracts_base=settings.alpaca_contracts_base))
+    options_engine = TradingEngine(options_market_data)
+    options_execution = OptionsSimAdapter(
+        options_engine, options_market_data, calendar,
+        owns_order=lambda o: o.account.mode == "paper"
+        and is_option_symbol(o.symbol))
 
     live_execution = None
     if settings.alpaca_trading_key_id:
@@ -99,10 +119,14 @@ def build_deps(settings: Settings | None = None, market_data=None,
                                    crypto_primary=BinanceData(),
                                    crypto_fallback=CoinbaseData())
 
-    def execution_for_symbol(symbol: str) -> SimAdapter:
+    def execution_for_symbol(symbol: str):
+        if is_option_symbol(symbol):
+            return options_execution
         return crypto_execution if is_crypto_symbol(symbol) else execution
 
     def market_data_for_symbol(symbol: str):
+        if is_option_symbol(symbol):
+            return options_market_data
         return crypto_market_data if is_crypto_symbol(symbol) else market_data
 
     runner = StrategyRunner(STRATEGIES_DIR, session_factory, execution_for_symbol,
@@ -112,6 +136,9 @@ def build_deps(settings: Settings | None = None, market_data=None,
                    execution=execution, runner=runner,
                    crypto_market_data=crypto_market_data, crypto_calendar=crypto_calendar,
                    crypto_engine=crypto_engine, crypto_execution=crypto_execution,
+                   options_market_data=options_market_data,
+                   options_engine=options_engine,
+                   options_execution=options_execution,
                    live_execution=live_execution, replay_sources=replay_sources)
 
 

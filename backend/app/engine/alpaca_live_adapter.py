@@ -5,7 +5,7 @@ from decimal import Decimal
 import httpx
 from sqlalchemy import select
 
-from app.assets import is_crypto_symbol
+from app.assets import is_crypto_symbol, is_option_symbol
 from app.engine.engine import InvalidOrderState, TradingEngine
 from app.models import Account, Order, Position
 from app.timeutil import utcnow
@@ -43,6 +43,9 @@ class AlpacaLiveAdapter:
         if is_crypto_symbol(order.symbol):
             return self.engine.reject_order(
                 session, order, "crypto not supported in live trading yet")
+        if is_option_symbol(order.symbol):
+            return self.engine.reject_order(
+                session, order, "options not supported on live")
         body = {"symbol": order.symbol, "qty": str(order.qty),
                 "side": order.side, "type": order.order_type,
                 "time_in_force": order.tif,

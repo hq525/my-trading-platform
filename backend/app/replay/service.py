@@ -7,7 +7,7 @@ from datetime import date
 
 from sqlalchemy import delete, select
 
-from app.assets import is_crypto_symbol
+from app.assets import is_crypto_symbol, is_option_symbol
 from app.marketdata.base import Bar, MarketDataError, UnknownSymbolError
 from app.models import (Account, EquitySnapshot, Fill, JournalNote, Order,
                         Position, ReplayBar, ReplaySession)
@@ -75,6 +75,8 @@ def create_session(db, sources: ReplaySources, *, symbols, start_date: date,
     symbols = list(dict.fromkeys(symbols))
     if not symbols:
         raise ReplayCreationError("at least one symbol is required")
+    if any(is_option_symbol(s) for s in symbols):
+        raise ReplayCreationError("options are not supported in replay")
     if starting_cash <= 0:
         raise ReplayCreationError("starting cash must be positive")
     unknown = [n for n in strategies if n not in known_strategies]

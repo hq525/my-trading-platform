@@ -3,7 +3,7 @@ from pathlib import Path
 
 import httpx
 
-from app.assets import is_crypto_symbol
+from app.assets import is_crypto_symbol, is_option_symbol
 from app.config import Settings
 from app.engine.alpaca_live_adapter import AlpacaLiveAdapter
 from app.engine.engine import TradingEngine
@@ -39,7 +39,8 @@ def make_live_deps(session_factory, tmp_path, live_handler=None):
     engine = TradingEngine(md)
     execution = SimAdapter(engine, md, cal,
                            owns_order=lambda o: o.account.mode == "paper"
-                           and not is_crypto_symbol(o.symbol))
+                           and not is_crypto_symbol(o.symbol)
+                           and not is_option_symbol(o.symbol))
 
     crypto_md = FakeMarketData()
     crypto_md.set_quote("BTC-USD", "65000")

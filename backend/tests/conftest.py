@@ -6,14 +6,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
-from app.assets import is_crypto_symbol
+from app.assets import is_crypto_symbol, is_option_symbol
 from app.config import Settings
 from app.db import Base, make_session_factory
 from app.engine.engine import TradingEngine
+from app.engine.options_sim_adapter import OptionsSimAdapter
 from app.engine.sim_adapter import SimAdapter
 from app.main import AppDeps, create_app
 from app.strategy.runner import StrategyRunner
-from tests.fakes import FakeCalendar, FakeMarketData
+from tests.fakes import Clock, FakeCalendar, FakeMarketData, FakeOptionsData
 
 
 @pytest.fixture
@@ -41,7 +42,8 @@ def client(session_factory, tmp_path):
     engine = TradingEngine(fake_md)
     execution = SimAdapter(engine, fake_md, fake_cal,
                            owns_order=lambda o: o.account.mode == "paper"
-                           and not is_crypto_symbol(o.symbol))
+                           and not is_crypto_symbol(o.symbol)
+                           and not is_option_symbol(o.symbol))
 
     crypto_fake_md = FakeMarketData()
     crypto_fake_md.set_quote("BTC-USD", "65000")
@@ -51,14 +53,28 @@ def client(session_factory, tmp_path):
                                   owns_order=lambda o: o.account.mode == "paper"
                                   and is_crypto_symbol(o.symbol))
 
+    options_fake_md = FakeOptionsData()
+    options_fake_md.set_option_quote("SPY260821C00625000", bid="4.90", ask="5.10")
+    options_fake_cal = FakeCalendar(open_=True)
+    options_clock = Clock()
+    options_engine = TradingEngine(options_fake_md, now_fn=options_clock)
+    options_execution = OptionsSimAdapter(options_engine, options_fake_md,
+                                          options_fake_cal, now_fn=options_clock,
+                                          owns_order=lambda o: o.account.mode == "paper"
+                                          and is_option_symbol(o.symbol))
+
     settings = Settings(password="pw", secret_key="test-secret")
     strategies_dir = tmp_path / "strategies"
     strategies_dir.mkdir()
 
     def execution_for_symbol(symbol: str):
+        if is_option_symbol(symbol):
+            return options_execution
         return crypto_execution if is_crypto_symbol(symbol) else execution
 
     def market_data_for_symbol(symbol: str):
+        if is_option_symbol(symbol):
+            return options_fake_md
         return crypto_fake_md if is_crypto_symbol(symbol) else fake_md
 
     runner = StrategyRunner(Path(strategies_dir), session_factory, execution_for_symbol,
@@ -67,7 +83,10 @@ def client(session_factory, tmp_path):
                    market_data=fake_md, calendar=fake_cal, engine=engine,
                    execution=execution, runner=runner,
                    crypto_market_data=crypto_fake_md, crypto_calendar=crypto_fake_cal,
-                   crypto_engine=crypto_engine, crypto_execution=crypto_execution)
+                   crypto_engine=crypto_engine, crypto_execution=crypto_execution,
+                   options_market_data=options_fake_md,
+                   options_engine=options_engine,
+                   options_execution=options_execution)
     app = create_app(deps, start_scheduler=False)
     c = TestClient(app)
     c.post("/api/login", json={"password": "pw"})
@@ -75,4 +94,6 @@ def client(session_factory, tmp_path):
     c.fake_cal = fake_cal
     c.crypto_fake_md = crypto_fake_md
     c.crypto_fake_cal = crypto_fake_cal
+    c.options_fake_md = options_fake_md
+    c.options_fake_cal = options_fake_cal
     return c

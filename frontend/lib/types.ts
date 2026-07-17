@@ -58,6 +58,8 @@ export interface Quote {
   symbol: string;
   price: string;
   as_of: string;
+  bid: string | null;
+  ask: string | null;
 }
 
 export interface Bar {
@@ -67,6 +69,33 @@ export interface Bar {
   low: string;
   close: string;
   volume: number;
+}
+
+export interface OptionChainRow {
+  symbol: string;
+  strike: string;
+  right: "call" | "put";
+  bid: string | null;
+  ask: string | null;
+  last: string | null;
+  open_interest: string | null;
+  iv: string | null;
+  delta: string | null;
+  gamma: string | null;
+  theta: string | null;
+  vega: string | null;
+}
+
+export interface OptionChain {
+  underlying: string;
+  expiry: string; // YYYY-MM-DD
+  calls: OptionChainRow[];
+  puts: OptionChainRow[];
+}
+
+export interface OptionExpirations {
+  underlying: string;
+  expirations: string[]; // YYYY-MM-DD, ascending
 }
 
 export interface Trade {

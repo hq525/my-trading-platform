@@ -8,6 +8,7 @@ import { AccountSwitcher } from "@/components/AccountSwitcher";
 const paperLinks = [
   { href: "/", label: "Dashboard" },
   { href: "/trade", label: "Trade" },
+  { href: "/options", label: "Options" },
   { href: "/orders", label: "Orders" },
   { href: "/journal", label: "Journal" },
   { href: "/strategies", label: "Strategies" },

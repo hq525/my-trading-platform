@@ -1,4 +1,5 @@
 import { formatQty, isCryptoSymbol } from "@/lib/qty";
+import { formatOptionLabel, isOptionSymbol } from "@/lib/options";
 import { formatUsd, isNeg } from "@/lib/money";
 import type { PositionValue } from "@/lib/types";
 
@@ -16,11 +17,15 @@ export function PositionsTable({ positions }: { positions: PositionValue[] }) {
   if (positions.length === 0) {
     return <p className="text-sm text-gray-500">No open positions.</p>;
   }
-  const stocks = positions.filter((p) => !isCryptoSymbol(p.symbol));
-  const crypto = positions.filter((p) => isCryptoSymbol(p.symbol));
+  const options = positions.filter((p) => isOptionSymbol(p.symbol));
+  const stocks = positions.filter(
+    (p) => !isOptionSymbol(p.symbol) && !isCryptoSymbol(p.symbol));
+  const crypto = positions.filter(
+    (p) => !isOptionSymbol(p.symbol) && isCryptoSymbol(p.symbol));
   const groups: { label: string; rows: PositionValue[] }[] = [
     ...(stocks.length > 0 ? [{ label: "Stocks", rows: stocks }] : []),
     ...(crypto.length > 0 ? [{ label: "Crypto", rows: crypto }] : []),
+    ...(options.length > 0 ? [{ label: "Options", rows: options }] : []),
   ];
   return (
     <table className="w-full text-sm tabular-nums">
@@ -44,7 +49,9 @@ export function PositionsTable({ positions }: { positions: PositionValue[] }) {
           </tr>
           {g.rows.map((p) => (
             <tr key={p.symbol} className="border-b border-gray-900">
-              <td className="py-2 font-medium text-gray-100">{p.symbol}</td>
+              <td className="py-2 font-medium text-gray-100">
+                {isOptionSymbol(p.symbol) ? formatOptionLabel(p.symbol) : p.symbol}
+              </td>
               <td className="py-2 text-right">{formatQty(p.qty)}</td>
               <td className="py-2 text-right">{formatUsd(p.avg_cost)}</td>
               <td className="py-2 text-right">{formatUsd(p.last_price)}</td>

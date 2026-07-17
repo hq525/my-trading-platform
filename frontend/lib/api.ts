@@ -1,7 +1,7 @@
 import type {
   Account, AccountDetail, Bar, Order, PlaceOrderBody, Quote, Snapshot,
   Stats, Strategy, StrategyRun, Trade, CreateReplaySessionBody, ReplaySession,
-  ReplaySessionDetail, StepResult,
+  ReplaySessionDetail, StepResult, OptionChain, OptionExpirations,
 } from "./types";
 
 export class ApiError extends Error {
@@ -66,6 +66,13 @@ export const api = {
     request<Quote>(`/api/market/quote/${encodeURIComponent(symbol)}`),
   bars: (symbol: string, limit = 200) =>
     request<Bar[]>(`/api/market/bars/${encodeURIComponent(symbol)}?limit=${limit}`),
+  optionExpirations: (underlying: string) =>
+    request<OptionExpirations>(
+      `/api/market/options/${encodeURIComponent(underlying)}/expirations`),
+  optionChain: (underlying: string, expiry: string) =>
+    request<OptionChain>(
+      `/api/market/options/${encodeURIComponent(underlying)}/chain?expiry=${
+        encodeURIComponent(expiry)}`),
   journal: (accountId: number) => request<Trade[]>(`/api/journal?account_id=${accountId}`),
   stats: (accountId: number) => request<Stats>(`/api/journal/stats?account_id=${accountId}`),
   strategies: () => request<Strategy[]>("/api/strategies"),

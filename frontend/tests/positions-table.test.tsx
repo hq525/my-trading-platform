@@ -29,3 +29,18 @@ it("shows the empty-state message when there are no positions at all", () => {
   render(<PositionsTable positions={[]} />);
   expect(screen.getByText(/no open positions/i)).toBeInTheDocument();
 });
+
+const optionPos: PositionValue = {
+  symbol: "SPY260821C00625000", qty: "2", avg_cost: "5.1", last_price: "6",
+  market_value: "1200", unrealized_pnl: "180", realized_pnl: "0",
+};
+
+it("groups option positions separately with human labels", () => {
+  render(<PositionsTable positions={[stock, crypto, optionPos]} />);
+  expect(screen.getByText("Options")).toBeInTheDocument();
+  expect(screen.getByText("SPY 08/21/26 $625 C")).toBeInTheDocument();
+  expect(screen.queryByText("SPY260821C00625000")).not.toBeInTheDocument();
+  // option rows never leak into the Stocks group
+  expect(screen.getByText("Stocks")).toBeInTheDocument();
+  expect(screen.getByText("AAPL")).toBeInTheDocument();
+});

@@ -75,3 +75,12 @@ it("shows the replay section links and hides the switcher there", async () => {
   expect(screen.queryByText("LIVE")).not.toBeInTheDocument();
   expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
 });
+
+it("shows the Options link in the paper section only", () => {
+  pathname = "/options";
+  renderNav();
+  expect(screen.getByRole("link", { name: "Options" })).toHaveAttribute(
+    "href", "/options");
+  const paper = screen.getByRole("link", { name: "Paper" });
+  expect(paper).toBeInTheDocument();
+});

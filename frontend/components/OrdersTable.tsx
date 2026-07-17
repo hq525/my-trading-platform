@@ -1,6 +1,7 @@
 import { formatDateTime } from "@/lib/format";
 import { formatUsd } from "@/lib/money";
 import { formatQty, isCryptoSymbol } from "@/lib/qty";
+import { formatOptionLabel, isOptionSymbol, parseOcc } from "@/lib/options";
 import type { Order } from "@/lib/types";
 
 const statusColor: Record<Order["status"], string> = {
@@ -43,11 +44,22 @@ export function OrdersTable({
           <tr key={o.id} className="border-b border-gray-900">
             <td className="py-2 text-gray-400">{formatDateTime(o.placed_at)}</td>
             <td className="py-2 font-medium">
-              <a href={`/trade?symbol=${o.symbol}`} className="text-gray-100 hover:underline">
-                {o.symbol}
+              <a
+                href={
+                  isOptionSymbol(o.symbol)
+                    ? `/options?symbol=${encodeURIComponent(parseOcc(o.symbol).underlying)}`
+                    : `/trade?symbol=${o.symbol}`
+                }
+                className="text-gray-100 hover:underline"
+              >
+                {isOptionSymbol(o.symbol) ? formatOptionLabel(o.symbol) : o.symbol}
               </a>
               <span className="ml-2 rounded bg-gray-800 px-1.5 py-0.5 text-[10px] uppercase text-gray-400">
-                {isCryptoSymbol(o.symbol) ? "Crypto" : "Stock"}
+                {isOptionSymbol(o.symbol)
+                  ? "Option"
+                  : isCryptoSymbol(o.symbol)
+                    ? "Crypto"
+                    : "Stock"}
               </span>
             </td>
             <td className={`py-2 ${o.side === "buy" ? "text-emerald-400" : "text-red-400"}`}>

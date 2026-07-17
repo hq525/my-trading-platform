@@ -130,3 +130,22 @@ it("excludes replay accounts from the journal fan-out", async () => {
   expect(vi.mocked(api.journal)).toHaveBeenCalledWith(1);
   expect(vi.mocked(api.journal)).not.toHaveBeenCalledWith(42);
 });
+
+it("tags option trades with an Option badge", async () => {
+  vi.mocked(api.journal).mockResolvedValue([
+    {
+      order_id: 30, symbol: "SPY260821C00625000", side: "sell", qty: "2",
+      price: "25", commission: "0", realized_pnl: "4000",
+      filled_at: "2026-07-17T20:05:00", note: null, account_mode: "paper" as const,
+    },
+  ]);
+  renderWithClient(
+    <AccountProvider>
+      <JournalPage />
+    </AccountProvider>,
+  );
+  expect(await screen.findByText("Option")).toBeInTheDocument();
+  expect(screen.queryByText("Stock")).not.toBeInTheDocument();
+  expect(screen.getByText(/SPY 08\/21\/26 \$625 C/)).toBeInTheDocument();
+  expect(screen.queryByText(/SPY260821C00625000/)).not.toBeInTheDocument();
+});

@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithClient } from "./utils";
 
@@ -100,6 +100,30 @@ it("clicking a row mounts the order ticket for that contract", async () => {
     await screen.findByText(/Order — SPY 08\/21\/26 \$625 C/),
   ).toBeInTheDocument();
   expect(screen.getByText("Bid $4.90 · Ask $5.10")).toBeInTheDocument();
+});
+
+it("re-syncs the mounted ticket to fresh chain data on refetch", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    vi.mocked(api.optionChain)
+      .mockResolvedValueOnce({
+        underlying: "SPY", expiry: "2026-08-21", calls: [call], puts: [put],
+      })
+      .mockResolvedValue({
+        underlying: "SPY", expiry: "2026-08-21",
+        calls: [{ ...call, bid: "5.00", ask: "5.30" }], puts: [put],
+      });
+    renderPage();
+    await user.type(screen.getByLabelText(/underlying/i), "spy");
+    await user.click(screen.getByRole("button", { name: /load/i }));
+    await user.click(await screen.findByText("625"));
+    expect(await screen.findByText("Bid $4.90 · Ask $5.10")).toBeInTheDocument();
+    await act(() => vi.advanceTimersByTimeAsync(30_000)); // chain refetchInterval fires
+    expect(await screen.findByText("Bid $5.00 · Ask $5.30")).toBeInTheDocument();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it("preloads the underlying from the symbol query param", async () => {

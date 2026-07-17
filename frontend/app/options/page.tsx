@@ -47,6 +47,14 @@ function OptionsView() {
   });
   const rows = (tab === "calls" ? chain.data?.calls : chain.data?.puts) ?? [];
 
+  // The ticket tracks the LIVE chain row for the selected contract, so a 30s
+  // chain refetch updates the ticket's bid/ask along with the table. Falls
+  // back to the click-time snapshot if the contract vanishes from the chain.
+  const chainRows = chain.data ? [...chain.data.calls, ...chain.data.puts] : [];
+  const liveSelected = selected
+    ? (chainRows.find((r) => r.symbol === selected.symbol) ?? selected)
+    : null;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4">
@@ -162,12 +170,12 @@ function OptionsView() {
           )}
         </section>
         <aside>
-          {selected ? (
+          {liveSelected ? (
             <OrderTicket
-              symbol={selected.symbol}
-              quotePrice={selected.ask ?? selected.last ?? undefined}
-              bid={selected.bid ?? undefined}
-              ask={selected.ask ?? undefined}
+              symbol={liveSelected.symbol}
+              quotePrice={liveSelected.ask ?? liveSelected.last ?? undefined}
+              bid={liveSelected.bid ?? undefined}
+              ask={liveSelected.ask ?? undefined}
             />
           ) : (
             <p className="text-sm text-gray-500">
